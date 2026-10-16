@@ -1,0 +1,20 @@
+{
+  "project_type": "React Native (Expo App Router)",
+  "styling": "NativeWind (Tailwind CSS v3)",
+  "icons": "lucide-react-native",
+  "backend": "Supabase",
+  "rules": [
+    "Strict Typescript usage.",
+    "Do not break existing folder structures or components.",
+    "Keep media storage abstracted in services/storageService.ts so Cloudflare R2 can be plugged in later easily.",
+    "Dark mode must use CSS variables or NativeWind dark class.",
+    "Ensure PDF picker (expo-document-picker) and Photo picker (expo-image-picker) are properly isolated in utils/mediaPicker.ts.",
+    "Use Expo Router for all navigation - routes live in app/ directory.",
+    "All non-route code (components, hooks, utils) must be outside app/ directory.",
+    "Use npx expo install instead of npm/yarn/pnpm/bun add for SDK-compatible versions.",
+    "Before declaring any task done, run: npx expo lint and npx tsc --noEmit",
+    "Use context/ for global state (ThemeContext, AuthContext).",
+    "Use services/ for API and external service integrations.",
+    "Use utils/ for helper functions and utilities."
+  ]
+}
