@@ -11,11 +11,15 @@ export function StorageImage({
 
   useEffect(() => {
     let active = true;
+    if (!uri) {
+      setResolvedUri(null);
+      return;
+    }
     void resolveMediaUrl(uri)
       .then((value) => {
         if (active) setResolvedUri(value);
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (active) setResolvedUri(null);
       });
     return () => {
