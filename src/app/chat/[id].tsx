@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ImageView from 'react-native-image-zoom-viewer';
 
 import { Avatar, Button } from '@/components/ui';
 import { StorageImage } from '@/components/StorageImage';
@@ -257,6 +258,8 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoToView, setPhotoToView] = useState<MessageRow | null>(null);
+  const [fullScreenImageVisible, setFullScreenImageVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [pending, setPending] = useState<Attachment | null>(
     params.att_id
       ? {
@@ -556,7 +559,15 @@ export default function Chat() {
                     message={item}
                     mine={mine}
                     onLongPress={() => showMessageActions(item)}
-                    onOpenPhoto={() => setPhotoToView(item)}
+                    onOpenPhoto={() => {
+                      const a = item.attachment;
+                      if (a?.kind === 'image' && a.image && !a.view_mode) {
+                        setSelectedImageUri(a.image);
+                        setFullScreenImageVisible(true);
+                      } else {
+                        setPhotoToView(item);
+                      }
+                    }}
                     t={t}
                   />
                 ) : null}
@@ -700,6 +711,28 @@ export default function Chat() {
           t={t}
         />
       ) : null}
+
+      <Modal visible={fullScreenImageVisible} transparent animationType="fade" onRequestClose={() => setFullScreenImageVisible(false)}>
+        <View className="flex-1 bg-black">
+          {selectedImageUri ? (
+            <ImageView
+              imageUrls={[{ url: selectedImageUri }]}
+              renderImage={(props) => (
+                <StorageImage uri={props.source.url} className="flex-1" resizeMode="contain" />
+              )}
+              onSwipeDown={() => setFullScreenImageVisible(false)}
+              enableSwipeDown
+              swipeDownThreshold={100}
+            />
+          ) : null}
+          <Pressable
+            onPress={() => setFullScreenImageVisible(false)}
+            className="absolute top-8 right-4 h-10 w-10 items-center justify-center rounded-full bg-black/50"
+          >
+            <X size={24} color="#fff" />
+          </Pressable>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

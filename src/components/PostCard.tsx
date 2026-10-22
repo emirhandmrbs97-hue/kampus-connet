@@ -1,7 +1,8 @@
-import { Archive, FileText, Heart, MessageCircle, MoreHorizontal, Send, Unlock, EyeOff } from 'lucide-react-native';
+import { Archive, FileText, Heart, MessageCircle, MoreHorizontal, Send, Unlock, EyeOff, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { memo, useState } from 'react';
-import { Animated, Pressable, Text, View } from 'react-native';
+import { Animated, Modal, Pressable, Text, View } from 'react-native';
+import ImageView from 'react-native-image-zoom-viewer';
 
 import { StorageImage } from '@/components/StorageImage';
 import { ActionSheet, Avatar } from '@/components/ui';
@@ -33,6 +34,7 @@ function PostCardBase({
   const { t } = useLanguage();
   const [scale] = useState(() => new Animated.Value(1));
   const [menuVisible, setMenuVisible] = useState(false);
+  const [fullScreenImageVisible, setFullScreenImageVisible] = useState(false);
   const isAuthor = post.author_id === user?.id;
   const hideLikeCount = post.hideLikeCount ?? post.hide_like_count ?? false;
   const commentsDisabled = post.commentsDisabled ?? post.comments_disabled ?? false;
@@ -110,11 +112,13 @@ function PostCardBase({
       ) : null}
 
       {post.media_type === 'image' && post.media_url ? (
-        <StorageImage
-          uri={post.media_url}
-          className="mt-3 h-64 w-full rounded-2xl bg-gray-200 dark:bg-gray-700"
-          resizeMode="cover"
-        />
+        <Pressable onPress={() => setFullScreenImageVisible(true)}>
+          <StorageImage
+            uri={post.media_url}
+            className="mt-3 h-64 w-full rounded-2xl bg-gray-200 dark:bg-gray-700"
+            resizeMode="cover"
+          />
+        </Pressable>
       ) : null}
 
       {post.media_type === 'pdf' && post.media_url ? (
@@ -195,6 +199,28 @@ function PostCardBase({
           ]}
         />
       ) : null}
+
+      <Modal visible={fullScreenImageVisible} transparent animationType="fade" onRequestClose={() => setFullScreenImageVisible(false)}>
+        <View className="flex-1 bg-black">
+          {post.media_url ? (
+            <ImageView
+              imageUrls={[{ url: post.media_url }]}
+              renderImage={(props) => (
+                <StorageImage uri={props.source.url} className="flex-1" resizeMode="contain" />
+              )}
+              onSwipeDown={() => setFullScreenImageVisible(false)}
+              enableSwipeDown
+              swipeDownThreshold={100}
+            />
+          ) : null}
+          <Pressable
+            onPress={() => setFullScreenImageVisible(false)}
+            className="absolute top-8 right-4 h-10 w-10 items-center justify-center rounded-full bg-black/50"
+          >
+            <X size={24} color="#fff" />
+          </Pressable>
+        </View>
+      </Modal>
     </View>
   );
 }
