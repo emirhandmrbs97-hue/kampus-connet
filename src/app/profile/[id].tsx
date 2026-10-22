@@ -6,12 +6,15 @@ import {
   Grid2X2,
   MoreHorizontal,
   UserRoundCheck,
+  X,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
+  Modal,
   Pressable,
   RefreshControl,
   Text,
@@ -26,6 +29,7 @@ import { useAuth } from '@/context/AuthContext';
 import { goBack } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 import { startConversation } from '@/services/chat';
+import { resolveMediaUrl } from '@/services/storageService';
 import type { PostRow, Profile } from '@/types';
 
 type ProfileStats = {
@@ -65,6 +69,8 @@ export default function UserProfileScreen() {
   const [busyAction, setBusyAction] = useState<'follow' | 'message' | null>(null);
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [reportReasonsVisible, setReportReasonsVisible] = useState(false);
+  const [fullScreenImageVisible, setFullScreenImageVisible] = useState(false);
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
     if (!id) return;
@@ -370,6 +376,16 @@ export default function UserProfileScreen() {
     })();
   };
 
+  const openFullScreenImage = async (imageUrl: string) => {
+    try {
+      const resolved = await resolveMediaUrl(imageUrl);
+      setResolvedImageUrl(resolved);
+      setFullScreenImageVisible(true);
+    } catch {
+      // Hata durumunda görüntüleme yapma
+    }
+  };
+
   const privateProfile = !!profile?.is_private && profile.id !== user?.id && !isFollowing;
   const isOwnProfile = profile?.id === user?.id;
 
@@ -514,7 +530,9 @@ export default function UserProfileScreen() {
             renderItem={({ item }) => (
               <View className="m-0.5 aspect-square flex-1 overflow-hidden bg-gray-100 dark:bg-gray-800">
                 {item.media_type === 'image' && item.media_url ? (
-                  <StorageImage uri={item.media_url} className="h-full w-full" resizeMode="cover" />
+                  <Pressable onPress={() => openFullScreenImage(item.media_url)}>
+                    <StorageImage uri={item.media_url} className="h-full w-full" resizeMode="cover" />
+                  </Pressable>
                 ) : (
                   <View className="flex-1 justify-center p-2">
                     <Text numberOfLines={6} className="text-xs text-gray-800 dark:text-gray-100">
@@ -558,6 +576,19 @@ export default function UserProfileScreen() {
             kind={connectionsKind}
             onClose={() => setConnectionsKind(null)}
           />
+          <Modal visible={fullScreenImageVisible} transparent animationType="fade" onRequestClose={() => setFullScreenImageVisible(false)}>
+            <Pressable className="flex-1 bg-black" onPress={() => setFullScreenImageVisible(false)}>
+              {resolvedImageUrl ? (
+                <Image source={{ uri: resolvedImageUrl }} className="flex-1" resizeMode="contain" />
+              ) : null}
+              <Pressable
+                onPress={() => setFullScreenImageVisible(false)}
+                className="absolute top-8 right-4 h-10 w-10 items-center justify-center rounded-full bg-black/50"
+              >
+                <X size={24} color="#fff" />
+              </Pressable>
+            </Pressable>
+          </Modal>
         </>
       )}
     </SafeAreaView>

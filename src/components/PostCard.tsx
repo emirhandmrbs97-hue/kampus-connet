@@ -1,8 +1,7 @@
 import { Archive, FileText, Heart, MessageCircle, MoreHorizontal, Send, Unlock, EyeOff, X } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { memo, useEffect, useState } from 'react';
-import { Animated, Modal, Pressable, Text, View } from 'react-native';
-import ImageView from 'react-native-image-zoom-viewer';
+import { Animated, Image, Modal, Pressable, Text, View } from 'react-native';
 
 import { StorageImage } from '@/components/StorageImage';
 import { ActionSheet, Avatar } from '@/components/ui';
@@ -213,14 +212,9 @@ function PostCardBase({
       ) : null}
 
       <Modal visible={fullScreenImageVisible} transparent animationType="fade" onRequestClose={() => setFullScreenImageVisible(false)}>
-        <View className="flex-1 bg-black">
+        <Pressable className="flex-1 bg-black" onPress={() => setFullScreenImageVisible(false)}>
           {resolvedImageUrl ? (
-            <ImageView
-              imageUrls={[{ url: resolvedImageUrl }]}
-              onSwipeDown={() => setFullScreenImageVisible(false)}
-              enableSwipeDown
-              swipeDownThreshold={100}
-            />
+            <Image source={{ uri: resolvedImageUrl }} className="flex-1" resizeMode="contain" />
           ) : null}
           <Pressable
             onPress={() => setFullScreenImageVisible(false)}
@@ -228,7 +222,7 @@ function PostCardBase({
           >
             <X size={24} color="#fff" />
           </Pressable>
-        </View>
+        </Pressable>
       </Modal>
     </View>
   );

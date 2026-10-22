@@ -17,7 +17,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ImageView from 'react-native-image-zoom-viewer';
 
 import { resolveMediaUrl } from '@/services/storageService';
 
@@ -720,14 +719,9 @@ export default function Chat() {
       ) : null}
 
       <Modal visible={fullScreenImageVisible} transparent animationType="fade" onRequestClose={() => setFullScreenImageVisible(false)}>
-        <View className="flex-1 bg-black">
+        <Pressable className="flex-1 bg-black" onPress={() => setFullScreenImageVisible(false)}>
           {resolvedImageUrl ? (
-            <ImageView
-              imageUrls={[{ url: resolvedImageUrl }]}
-              onSwipeDown={() => setFullScreenImageVisible(false)}
-              enableSwipeDown
-              swipeDownThreshold={100}
-            />
+            <Image source={{ uri: resolvedImageUrl }} className="flex-1" resizeMode="contain" />
           ) : null}
           <Pressable
             onPress={() => setFullScreenImageVisible(false)}
@@ -735,7 +729,7 @@ export default function Chat() {
           >
             <X size={24} color="#fff" />
           </Pressable>
-        </View>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
