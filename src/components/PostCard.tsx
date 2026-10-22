@@ -1,6 +1,6 @@
 import { Archive, FileText, Heart, MessageCircle, MoreHorizontal, Send, Unlock, EyeOff, X } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Animated, Modal, Pressable, Text, View } from 'react-native';
 import ImageView from 'react-native-image-zoom-viewer';
 
@@ -11,6 +11,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { MentionText } from '@/components/MentionText';
 import { timeAgo } from '@/lib/format';
 import { openFile } from '@/lib/openFile';
+import { resolveMediaUrl } from '@/services/storageService';
 import type { PostView } from '@/types';
 
 function PostCardBase({
@@ -35,6 +36,7 @@ function PostCardBase({
   const [scale] = useState(() => new Animated.Value(1));
   const [menuVisible, setMenuVisible] = useState(false);
   const [fullScreenImageVisible, setFullScreenImageVisible] = useState(false);
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(null);
   const isAuthor = post.author_id === user?.id;
   const hideLikeCount = post.hideLikeCount ?? post.hide_like_count ?? false;
   const commentsDisabled = post.commentsDisabled ?? post.comments_disabled ?? false;
@@ -53,6 +55,16 @@ function PostCardBase({
     if (onToggleLikeCount) onToggleLikeCount(post);
     setMenuVisible(false);
   };
+
+  useEffect(() => {
+    if (post.media_url) {
+      resolveMediaUrl(post.media_url)
+        .then(setResolvedImageUrl)
+        .catch(() => setResolvedImageUrl(null));
+    } else {
+      setResolvedImageUrl(null);
+    }
+  }, [post.media_url]);
 
   const like = () => {
     if (!post.liked) {
@@ -202,12 +214,9 @@ function PostCardBase({
 
       <Modal visible={fullScreenImageVisible} transparent animationType="fade" onRequestClose={() => setFullScreenImageVisible(false)}>
         <View className="flex-1 bg-black">
-          {post.media_url ? (
+          {resolvedImageUrl ? (
             <ImageView
-              imageUrls={[{ url: post.media_url }]}
-              renderImage={(props) => (
-                <StorageImage uri={props.source.url} className="flex-1" resizeMode="contain" />
-              )}
+              imageUrls={[{ url: resolvedImageUrl }]}
               onSwipeDown={() => setFullScreenImageVisible(false)}
               enableSwipeDown
               swipeDownThreshold={100}

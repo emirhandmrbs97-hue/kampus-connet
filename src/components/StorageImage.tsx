@@ -16,7 +16,6 @@ export function StorageImage({
         if (active) setResolvedUri(value);
       })
       .catch((error: unknown) => {
-        console.error('Medya görüntüsü yüklenemedi:', error);
         if (active) setResolvedUri(null);
       });
     return () => {

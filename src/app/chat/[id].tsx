@@ -19,6 +19,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ImageView from 'react-native-image-zoom-viewer';
 
+import { resolveMediaUrl } from '@/services/storageService';
+
 import { Avatar, Button } from '@/components/ui';
 import { StorageImage } from '@/components/StorageImage';
 import { useAuth } from '@/context/AuthContext';
@@ -259,7 +261,7 @@ export default function Chat() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoToView, setPhotoToView] = useState<MessageRow | null>(null);
   const [fullScreenImageVisible, setFullScreenImageVisible] = useState(false);
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [resolvedImageUrl, setResolvedImageUrl] = useState<string | null>(null);
   const [pending, setPending] = useState<Attachment | null>(
     params.att_id
       ? {
@@ -559,11 +561,16 @@ export default function Chat() {
                     message={item}
                     mine={mine}
                     onLongPress={() => showMessageActions(item)}
-                    onOpenPhoto={() => {
+                    onOpenPhoto={async () => {
                       const a = item.attachment;
                       if (a?.kind === 'image' && a.image && !a.view_mode) {
-                        setSelectedImageUri(a.image);
-                        setFullScreenImageVisible(true);
+                        try {
+                          const resolved = await resolveMediaUrl(a.image);
+                          setResolvedImageUrl(resolved);
+                          setFullScreenImageVisible(true);
+                        } catch {
+                          setPhotoToView(item);
+                        }
                       } else {
                         setPhotoToView(item);
                       }
@@ -714,12 +721,9 @@ export default function Chat() {
 
       <Modal visible={fullScreenImageVisible} transparent animationType="fade" onRequestClose={() => setFullScreenImageVisible(false)}>
         <View className="flex-1 bg-black">
-          {selectedImageUri ? (
+          {resolvedImageUrl ? (
             <ImageView
-              imageUrls={[{ url: selectedImageUri }]}
-              renderImage={(props) => (
-                <StorageImage uri={props.source.url} className="flex-1" resizeMode="contain" />
-              )}
+              imageUrls={[{ url: resolvedImageUrl }]}
               onSwipeDown={() => setFullScreenImageVisible(false)}
               enableSwipeDown
               swipeDownThreshold={100}
