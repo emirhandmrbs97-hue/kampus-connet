@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, Text, TextInput, View } 
 
 import { Avatar, EmptyState, Sheet } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/lib/supabase';
 import { startConversation } from '@/services/chat';
 import type { Profile } from '@/types';
@@ -20,6 +21,7 @@ export function NewMessageSheet({
   initialQuery?: string;
 }) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Profile[]>([]);
   const [following, setFollowing] = useState<Set<string>>(new Set());
@@ -90,12 +92,12 @@ export function NewMessageSheet({
   };
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Yeni mesaj" tall>
+    <Sheet visible={visible} onClose={onClose} title={t('newMessage')} tall>
       <View className="mb-3 flex-row items-center rounded-2xl bg-gray-100 px-4 dark:bg-gray-800">
         <Search size={18} color="#9ca3af" />
         <TextInput
           className="ml-2 flex-1 py-3.5 text-base text-gray-900 dark:text-white"
-          placeholder="Kullanıcı adı ara"
+          placeholder={t('userSearch')}
           placeholderTextColor="#9ca3af"
           autoCapitalize="none"
           autoCorrect={false}
@@ -110,9 +112,9 @@ export function NewMessageSheet({
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           query.trim().length >= 2 && !loading ? (
-            <EmptyState title="Kullanıcı bulunamadı" />
+            <EmptyState title={t('userNotFound')} />
           ) : (
-            <EmptyState title="Kullanıcı ara" hint="En az 2 harf yaz." />
+            <EmptyState title={t('searchUser')} hint={t('typeTwoChars')} />
           )
         }
         renderItem={({ item }) => (
@@ -129,7 +131,7 @@ export function NewMessageSheet({
               className={`rounded-xl px-3 py-2 ${following.has(item.id) ? 'bg-gray-200 dark:bg-gray-700' : 'bg-primary-500'}`}
             >
               <Text className={following.has(item.id) ? 'text-gray-700 dark:text-gray-200' : 'font-semibold text-white'}>
-                {following.has(item.id) ? 'Takipte' : 'Takip et'}
+                {following.has(item.id) ? t('following') : t('follow')}
               </Text>
             </Pressable>
           </View>

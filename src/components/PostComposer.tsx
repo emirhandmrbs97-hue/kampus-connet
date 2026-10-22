@@ -1,14 +1,16 @@
 import { FileText, Camera, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Image, Pressable, Text, TextInput, View } from 'react-native';
 
-import { Button, Sheet } from '@/components/ui';
+import { Avatar, Button, Sheet } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
+import { searchMentionCandidates, type MentionCandidate } from '@/services/mentions';
 import { supabase } from '@/lib/supabase';
 import { pickImage, pickPdf } from '@/services/mediaPicker';
 import { uploadMedia } from '@/services/storageService';
 
-type Picked = { kind: 'image' | 'pdf'; uri: string; name?: string };
+type Picked = { kind: 'image' | 'pdf'; uri: string; name?: string; file?: Blob };
 
 export function PostComposer({
   visible,
@@ -20,9 +22,25 @@ export function PostComposer({
   onPosted: () => void;
 }) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [body, setBody] = useState('');
   const [media, setMedia] = useState<Picked | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mentionCandidates, setMentionCandidates] = useState<MentionCandidate[]>([]);
+
+  const searchMentions = useCallback(async (value: string) => {
+    const match = value.match(/(?:^|\s)@([a-zA-Z0-9._]{1,20})$/);
+    if (!match) {
+      setMentionCandidates([]);
+      return;
+    }
+    try {
+      setMentionCandidates(await searchMentionCandidates(match[1] ?? ''));
+    } catch (error) {
+      console.error('Gönderi mention araması başarısız:', error);
+      setMentionCandidates([]);
+    }
+  }, []);
 
   const reset = () => {
     setBody('');
@@ -31,11 +49,11 @@ export function PostComposer({
 
   const addImage = async () => {
     const p = await pickImage();
-    if (p) setMedia({ kind: 'image', uri: p.uri });
+    if (p) setMedia({ kind: 'image', uri: p.uri, name: p.name, file: p.file });
   };
   const addPdf = async () => {
     const p = await pickPdf();
-    if (p) setMedia({ kind: 'pdf', uri: p.uri, name: p.name });
+    if (p) setMedia({ kind: 'pdf', uri: p.uri, name: p.name, file: p.file });
   };
 
   const submit = async () => {
@@ -48,7 +66,12 @@ export function PostComposer({
     try {
       let uploaded: { url: string; kind: 'image' | 'pdf'; fileName?: string } | null = null;
       if (media) {
-        uploaded = await uploadMedia(media.uri, { kind: media.kind, folder: 'posts', fileName: media.name });
+        uploaded = await uploadMedia(media.uri, {
+          kind: media.kind,
+          folder: 'posts',
+          fileName: media.name,
+          file: media.file,
+        });
       }
       const { error } = await supabase.from('posts').insert({
         author_id: user.id,
@@ -69,16 +92,44 @@ export function PostComposer({
   };
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Yeni gönderi">
+    <Sheet visible={visible} onClose={onClose} title={t('newPost')}>
       <TextInput
         className="min-h-[110px] rounded-2xl bg-gray-100 p-4 text-base text-gray-900 dark:bg-gray-800 dark:text-white"
-        placeholder="Ne düşünüyorsun?"
+        placeholder={t('postThought')}
         placeholderTextColor="#9ca3af"
         multiline
         textAlignVertical="top"
         value={body}
-        onChangeText={setBody}
+        onChangeText={(value) => {
+          setBody(value);
+          void searchMentions(value);
+        }}
       />
+      {mentionCandidates.length ? (
+        <View className="mt-2 max-h-36 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+          {mentionCandidates.map((candidate) => (
+            <Pressable
+              key={candidate.id}
+              onPress={() => {
+                setBody((current) =>
+                  current.replace(/(?:^|\s)@[a-zA-Z0-9._]{1,20}$/, (match) => {
+                    const prefix = match.startsWith(' ') ? ' ' : '';
+                    return `${prefix}@${candidate.username} `;
+                  }),
+                );
+                setMentionCandidates([]);
+              }}
+              className="flex-row items-center border-b border-gray-100 px-3 py-2 dark:border-gray-700"
+            >
+              <Avatar uri={candidate.avatar_url} name={candidate.full_name} size={30} />
+              <View className="ml-2">
+                <Text className="font-semibold text-gray-900 dark:text-white">@{candidate.username}</Text>
+                <Text className="text-xs text-gray-500 dark:text-gray-400">{candidate.full_name}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       {media?.kind === 'image' ? (
         <View className="mt-3">
@@ -103,11 +154,11 @@ export function PostComposer({
       <View className="my-4 flex-row gap-3">
         <Pressable onPress={addImage} className="flex-1 flex-row items-center justify-center rounded-2xl bg-primary-50 py-3 dark:bg-gray-800">
           <Camera size={18} color="#0ea5e9" />
-          <Text className="ml-2 font-semibold text-primary-700 dark:text-primary-300">Fotoğraf</Text>
+          <Text className="ml-2 font-semibold text-primary-700 dark:text-primary-300">{t('addPhoto')}</Text>
         </Pressable>
         <Pressable onPress={addPdf} className="flex-1 flex-row items-center justify-center rounded-2xl bg-primary-50 py-3 dark:bg-gray-800">
           <FileText size={18} color="#0ea5e9" />
-          <Text className="ml-2 font-semibold text-primary-700 dark:text-primary-300">PDF</Text>
+          <Text className="ml-2 font-semibold text-primary-700 dark:text-primary-300">{t('addPdf')}</Text>
         </Pressable>
       </View>
 

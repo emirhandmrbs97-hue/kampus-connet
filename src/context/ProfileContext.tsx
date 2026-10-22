@@ -16,7 +16,14 @@ import type { Profile } from '@/types';
 type ProfileContextValue = {
   profile: Profile | null;
   refresh: () => Promise<void>;
-  updateProfile: (patch: Partial<Pick<Profile, 'username' | 'avatar_url' | 'is_private' | 'full_name' | 'bio'>>) => Promise<string | null>;
+  updateProfile: (
+    patch: Partial<
+      Pick<
+        Profile,
+        'username' | 'avatar_url' | 'is_private' | 'full_name' | 'bio' | 'dm_privacy' | 'story_reply_privacy'
+      >
+    >,
+  ) => Promise<string | null>;
 };
 
 const ProfileContext = createContext<ProfileContextValue | undefined>(undefined);

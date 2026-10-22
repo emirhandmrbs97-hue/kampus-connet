@@ -1,15 +1,14 @@
-import { Archive, ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-
 import { EmptyState } from '@/components/ui';
 import { PostCard } from '@/components/PostCard';
 import { useAuth } from '@/context/AuthContext';
+import { goBack } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 import { fetchProfiles } from '@/services/profiles';
-import type { PostRow, PostView } from '@/types';
+import type { PostView } from '@/types';
 
 export default function ArchiveScreen() {
   const { user } = useAuth();
@@ -65,11 +64,12 @@ export default function ArchiveScreen() {
 
   const toggleArchive = useCallback(
     async (post: PostView) => {
-      if (!user) return;
+      if (!user || post.author_id !== user.id) return;
       const { error } = await supabase
         .from('posts')
         .update({ is_archived: false })
-        .eq('id', post.id);
+        .eq('id', post.id)
+        .eq('author_id', user.id);
       if (error) {
         Alert.alert('Hata', 'Gönderi arşivden çıkarılamadı');
       } else {
@@ -81,7 +81,7 @@ export default function ArchiveScreen() {
 
   const toggleComments = useCallback(
     async (post: PostView) => {
-      if (!user) return;
+      if (!user || post.author_id !== user.id) return;
       const nextDisabled = !post.commentsDisabled;
       setPosts((prev) =>
         prev.map((p) => (p.id === post.id ? { ...p, commentsDisabled: nextDisabled } : p)),
@@ -89,11 +89,13 @@ export default function ArchiveScreen() {
       const { error } = await supabase
         .from('posts')
         .update({ comments_disabled: nextDisabled })
-        .eq('id', post.id);
+        .eq('id', post.id)
+        .eq('author_id', user.id);
       if (error) {
         setPosts((prev) =>
           prev.map((p) => (p.id === post.id ? { ...p, commentsDisabled: post.commentsDisabled } : p)),
         );
+        Alert.alert('Yorum ayarı güncellenemedi', error.message);
       }
     },
     [user],
@@ -101,7 +103,7 @@ export default function ArchiveScreen() {
 
   const toggleLikeCount = useCallback(
     async (post: PostView) => {
-      if (!user) return;
+      if (!user || post.author_id !== user.id) return;
       const nextHide = !post.hideLikeCount;
       setPosts((prev) =>
         prev.map((p) => (p.id === post.id ? { ...p, hideLikeCount: nextHide } : p)),
@@ -109,11 +111,13 @@ export default function ArchiveScreen() {
       const { error } = await supabase
         .from('posts')
         .update({ hide_like_count: nextHide })
-        .eq('id', post.id);
+        .eq('id', post.id)
+        .eq('author_id', user.id);
       if (error) {
         setPosts((prev) =>
           prev.map((p) => (p.id === post.id ? { ...p, hideLikeCount: post.hideLikeCount } : p)),
         );
+        Alert.alert('Beğeni ayarı güncellenemedi', error.message);
       }
     },
     [user],
@@ -122,7 +126,7 @@ export default function ArchiveScreen() {
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white dark:bg-gray-900">
       <View className="flex-row items-center px-5 pt-2 mb-4">
-        <Pressable onPress={() => router.back()} className="mr-4">
+        <Pressable onPress={() => goBack()} className="mr-4">
           <ChevronLeft size={24} color="#374151" className="dark:text-gray-300" />
         </Pressable>
         <Text className="text-2xl font-extrabold text-gray-900 dark:text-white">Arşiv</Text>

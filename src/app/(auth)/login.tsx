@@ -1,29 +1,33 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Field } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { validateEmail } from '@/lib/validation';
+import { validateUsername } from '@/lib/validation';
 
 export default function Login() {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string | null; password?: string | null; form?: string | null }>({});
+  const [errors, setErrors] = useState<{
+    username?: string | null;
+    password?: string | null;
+    form?: string | null;
+  }>({});
 
   const onSubmit = async () => {
     const next = {
-      email: validateEmail(email),
+      username: validateUsername(username.trim().toLowerCase()),
       password: password ? null : 'Şifreni gir.',
     };
     setErrors(next);
-    if (next.email || next.password) return;
+    if (next.username || next.password) return;
     setBusy(true);
-    const result = await signIn(email, password);
+    const result = await signIn(username.trim().toLowerCase(), password);
     setBusy(false);
     if (result.error) setErrors({ form: result.error });
   };
@@ -36,12 +40,15 @@ export default function Login() {
           keyboardShouldPersistTaps="handled"
         >
           <View className="mb-10">
-            <View className="mb-5 h-16 w-16 items-center justify-center rounded-3xl bg-primary-500">
-              <Text className="text-2xl font-extrabold text-white">C</Text>
-            </View>
+            <Image
+              source={require('../../../assets/icon.png')}
+              accessibilityLabel="KampüsHub logosu"
+              className="mb-5 h-20 w-20 rounded-3xl"
+              resizeMode="cover"
+            />
             <Text className="text-4xl font-extrabold text-gray-900 dark:text-white">Tekrar hoş geldin</Text>
             <Text className="mt-2 text-base text-gray-500 dark:text-gray-400">
-              Campus Connect hesabına giriş yap.
+              KampüsHub hesabına giriş yap.
             </Text>
           </View>
 
@@ -54,14 +61,14 @@ export default function Login() {
           )}
 
           <Field
-            label="E-posta"
-            placeholder="ornek@universite.edu.tr"
+            label="Kullanıcı adı"
+            placeholder="kullanici.adin"
             autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-            error={errors.email}
+            autoCorrect={false}
+            autoComplete="username"
+            value={username}
+            onChangeText={setUsername}
+            error={errors.username}
           />
           <Field
             label="Şifre"

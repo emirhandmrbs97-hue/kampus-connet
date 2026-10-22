@@ -1,18 +1,17 @@
-import { Camera, Image as ImageIcon, X } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
   type TextInputProps,
 } from 'react-native';
+import { StorageImage } from '@/components/StorageImage';
 
 export function Avatar({
   uri,
@@ -27,7 +26,7 @@ export function Avatar({
 }) {
   const initial = (name ?? '?').trim().charAt(0).toUpperCase() || '?';
   const avatarContent = uri ? (
-    <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+    <StorageImage uri={uri} style={{ width: size, height: size, borderRadius: size / 2 }} />
   ) : (
     <View
       style={{ width: size, height: size, borderRadius: size / 2 }}
@@ -280,7 +279,7 @@ export function FullScreenImage({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable className="flex-1 bg-black" onPress={onClose}>
         {uri ? (
-          <Image source={{ uri }} className="flex-1" resizeMode="contain" />
+          <StorageImage uri={uri} className="flex-1" resizeMode="contain" />
         ) : null}
         <Pressable
           onPress={onClose}

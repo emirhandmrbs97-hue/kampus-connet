@@ -1,8 +1,13 @@
 import { Archive, FileText, Heart, MessageCircle, MoreHorizontal, Send, Unlock, EyeOff } from 'lucide-react-native';
-import { memo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { memo, useState } from 'react';
+import { Animated, Pressable, Text, View } from 'react-native';
 
+import { StorageImage } from '@/components/StorageImage';
 import { ActionSheet, Avatar } from '@/components/ui';
+import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
+import { MentionText } from '@/components/MentionText';
 import { timeAgo } from '@/lib/format';
 import { openFile } from '@/lib/openFile';
 import type { PostView } from '@/types';
@@ -24,8 +29,13 @@ function PostCardBase({
   onToggleComments?: (post: PostView) => void;
   onToggleLikeCount?: (post: PostView) => void;
 }) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const { user } = useAuth();
+  const { t } = useLanguage();
+  const [scale] = useState(() => new Animated.Value(1));
   const [menuVisible, setMenuVisible] = useState(false);
+  const isAuthor = post.author_id === user?.id;
+  const hideLikeCount = post.hideLikeCount ?? post.hide_like_count ?? false;
+  const commentsDisabled = post.commentsDisabled ?? post.comments_disabled ?? false;
 
   const handleArchive = () => {
     if (onArchive) onArchive(post);
@@ -55,27 +65,53 @@ function PostCardBase({
   return (
     <View className="mx-4 mb-4 rounded-3xl bg-gray-50 p-4 dark:bg-gray-800">
       <View className="flex-row items-center">
-        <Avatar uri={post.author?.avatar_url} name={post.author?.full_name} size={40} />
-        <View className="ml-3 flex-1">
-          <Text className="font-semibold text-gray-900 dark:text-white">
-            {post.author?.full_name || post.author?.username || 'Kullanıcı'}
-          </Text>
-          <Text className="text-xs text-gray-500 dark:text-gray-400">
-            @{post.author?.username} · {timeAgo(post.created_at)}
-          </Text>
-        </View>
-        <Pressable onPress={() => setMenuVisible(true)} hitSlop={8}>
-          <MoreHorizontal size={22} color="#9ca3af" />
+        <Pressable
+          onPress={() =>
+            post.author?.id &&
+            router.push({ pathname: '/profile/[id]', params: { id: post.author.id } })
+          }
+          accessibilityRole="link"
+        >
+          <Avatar uri={post.author?.avatar_url} name={post.author?.full_name} size={40} />
         </Pressable>
+        <View className="ml-3 flex-1">
+          <Pressable
+            onPress={() =>
+              post.author?.id &&
+              router.push({ pathname: '/profile/[id]', params: { id: post.author.id } })
+            }
+            accessibilityRole="link"
+          >
+            <Text className="font-semibold text-gray-900 dark:text-white">
+              {post.author?.full_name || post.author?.username || 'Kullanıcı'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() =>
+              post.author?.id &&
+              router.push({ pathname: '/profile/[id]', params: { id: post.author.id } })
+            }
+            accessibilityRole="link"
+          >
+            <Text className="text-xs text-gray-500 dark:text-gray-400">
+              @{post.author?.username} · {timeAgo(post.created_at)}
+            </Text>
+          </Pressable>
+        </View>
+        {isAuthor ? (
+          <Pressable onPress={() => setMenuVisible(true)} hitSlop={8} accessibilityLabel={t('postOptions')}>
+            <MoreHorizontal size={22} color="#9ca3af" />
+          </Pressable>
+        ) : null}
       </View>
 
       {post.body ? (
-        <Text className="mt-3 text-base leading-6 text-gray-900 dark:text-gray-100">{post.body}</Text>
+        <MentionText className="mt-3 text-base leading-6 text-gray-900 dark:text-gray-100">{post.body}</MentionText>
       ) : null}
 
       {post.media_type === 'image' && post.media_url ? (
-        <Image
-          source={{ uri: post.media_url }}
+        <StorageImage
+          uri={post.media_url}
           className="mt-3 h-64 w-full rounded-2xl bg-gray-200 dark:bg-gray-700"
           resizeMode="cover"
         />
@@ -93,7 +129,7 @@ function PostCardBase({
             <Text numberOfLines={1} className="font-semibold text-gray-900 dark:text-white">
               {post.file_name ?? 'Belge.pdf'}
             </Text>
-            <Text className="text-xs text-gray-500 dark:text-gray-400">PDF belgesi · Açmak için dokun</Text>
+            <Text className="text-xs text-gray-500 dark:text-gray-400">{t('pdfOpenHint')}</Text>
           </View>
         </Pressable>
       ) : null}
@@ -107,44 +143,58 @@ function PostCardBase({
               fill={post.liked ? '#ef4444' : 'transparent'}
             />
           </Animated.View>
-          {!post.hideLikeCount && (
+          {!hideLikeCount || isAuthor ? (
             <Text className="ml-1.5 text-sm text-gray-600 dark:text-gray-300">{post.likeCount}</Text>
+          ) : (
+            <Text className="ml-1.5 text-xs text-gray-500 dark:text-gray-400">{t('likeHidden')}</Text>
           )}
         </Pressable>
-        <Pressable onPress={() => onComment(post)} hitSlop={8} className="mr-6 flex-row items-center">
+        <Pressable
+          onPress={() => {
+            if (!commentsDisabled) onComment(post);
+          }}
+          disabled={commentsDisabled}
+          hitSlop={8}
+          className="mr-6 flex-row items-center"
+          accessibilityState={{ disabled: commentsDisabled }}
+        >
           <MessageCircle size={24} color="#9ca3af" />
-          <Text className="ml-1.5 text-sm text-gray-600 dark:text-gray-300">{post.commentCount}</Text>
+          {!commentsDisabled ? (
+            <Text className="ml-1.5 text-sm text-gray-600 dark:text-gray-300">{post.commentCount}</Text>
+          ) : null}
         </Pressable>
         <Pressable onPress={() => onShare(post)} hitSlop={8} className="ml-auto">
           <Send size={22} color="#9ca3af" />
         </Pressable>
       </View>
 
-      {post.commentsDisabled && (
-        <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">Yorumlar kapatıldı</Text>
+      {commentsDisabled && (
+        <Text className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('commentsOff')}</Text>
       )}
 
-      <ActionSheet
-        visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
-        options={[
-          {
-            label: post.is_archived ? 'Arşivden Çıkar' : 'Arşivle',
-            icon: <Archive size={20} color="#0ea5e9" />,
-            onPress: handleArchive,
-          },
-          {
-            label: post.commentsDisabled ? 'Yorum Yapmayı Aç' : 'Yorum Yapmayı Kapat',
-            icon: post.commentsDisabled ? <Unlock size={20} color="#0ea5e9" /> : <EyeOff size={20} color="#0ea5e9" />,
-            onPress: handleToggleComments,
-          },
-          {
-            label: post.hideLikeCount ? 'Beğeni Sayısını Göster' : 'Beğeni Sayısını Gizle',
-            icon: <EyeOff size={20} color="#0ea5e9" />,
-            onPress: handleToggleLikeCount,
-          },
-        ]}
-      />
+      {isAuthor ? (
+        <ActionSheet
+          visible={menuVisible}
+          onClose={() => setMenuVisible(false)}
+          options={[
+            {
+              label: post.is_archived ? t('restoreArchive') : t('archiveChat'),
+              icon: <Archive size={20} color="#0ea5e9" />,
+              onPress: handleArchive,
+            },
+            {
+              label: commentsDisabled ? t('turnCommentsOn') : t('turnCommentsOff'),
+              icon: commentsDisabled ? <Unlock size={20} color="#0ea5e9" /> : <EyeOff size={20} color="#0ea5e9" />,
+              onPress: handleToggleComments,
+            },
+            {
+              label: hideLikeCount ? t('showLikeCount') : t('hideLikeCount'),
+              icon: <EyeOff size={20} color="#0ea5e9" />,
+              onPress: handleToggleLikeCount,
+            },
+          ]}
+        />
+      ) : null}
     </View>
   );
 }

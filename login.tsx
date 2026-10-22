@@ -62,7 +62,7 @@ export default function LoginScreen() {
             Giriş Yap
           </Text>
           <Text className={`text-base ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            Campus Connect'a hoş geldin
+            KampüsHub'a hoş geldin
           </Text>
         </View>
 

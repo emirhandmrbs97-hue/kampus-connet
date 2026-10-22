@@ -1,6 +1,7 @@
-import { Plus, Search, X } from 'lucide-react-native';
+import { BellRing, Plus, UserPlus } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CommentsSheet } from '@/components/CommentsSheet';
@@ -10,20 +11,23 @@ import { ShareSheet } from '@/components/ShareSheet';
 import { StoriesBar, type StoriesBarHandle } from '@/components/StoriesBar';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
+import { useNotifications } from '@/context/NotificationsContext';
 import { supabase } from '@/lib/supabase';
 import { fetchProfiles } from '@/services/profiles';
-import type { Attachment, PostRow, PostView } from '@/types';
+import type { Attachment, PostView } from '@/types';
 
 export default function Home() {
   const { user } = useAuth();
+  const { t } = useLanguage();
+  const { unreadCount } = useNotifications();
+  const { postId } = useLocalSearchParams<{ postId?: string }>();
   const [posts, setPosts] = useState<PostView[]>([]);
-  const [filteredPosts, setFilteredPosts] = useState<PostView[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<PostView | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const storiesRef = useRef<StoriesBarHandle>(null);
 
   const load = useCallback(async () => {
@@ -64,19 +68,8 @@ export default function Home() {
   }, [load]);
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredPosts(posts);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = posts.filter(
-        (post) =>
-          post.body?.toLowerCase().includes(query) ||
-          post.author?.username?.toLowerCase().includes(query) ||
-          post.author?.full_name?.toLowerCase().includes(query),
-      );
-      setFilteredPosts(filtered);
-    }
-  }, [posts, searchQuery]);
+    if (postId) setCommentPostId(postId);
+  }, [postId]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -102,6 +95,7 @@ export default function Home() {
             p.id === post.id ? { ...p, liked: post.liked, likeCount: post.likeCount } : p,
           ),
         );
+        Alert.alert('Beğeni güncellenemedi', error.message);
       }
     },
     [user],
@@ -109,7 +103,7 @@ export default function Home() {
 
   const toggleArchive = useCallback(
     async (post: PostView) => {
-      if (!user) return;
+      if (!user || post.author_id !== user.id) return;
       const nextArchived = !post.is_archived;
       setPosts((prev) =>
         prev.map((p) => (p.id === post.id ? { ...p, is_archived: nextArchived } : p)),
@@ -117,11 +111,13 @@ export default function Home() {
       const { error } = await supabase
         .from('posts')
         .update({ is_archived: nextArchived })
-        .eq('id', post.id);
+        .eq('id', post.id)
+        .eq('author_id', user.id);
       if (error) {
         setPosts((prev) =>
           prev.map((p) => (p.id === post.id ? { ...p, is_archived: post.is_archived } : p)),
         );
+        Alert.alert('Gönderi güncellenemedi', error.message);
       }
     },
     [user],
@@ -129,7 +125,7 @@ export default function Home() {
 
   const toggleComments = useCallback(
     async (post: PostView) => {
-      if (!user) return;
+      if (!user || post.author_id !== user.id) return;
       const nextDisabled = !post.commentsDisabled;
       setPosts((prev) =>
         prev.map((p) => (p.id === post.id ? { ...p, commentsDisabled: nextDisabled } : p)),
@@ -137,11 +133,13 @@ export default function Home() {
       const { error } = await supabase
         .from('posts')
         .update({ comments_disabled: nextDisabled })
-        .eq('id', post.id);
+        .eq('id', post.id)
+        .eq('author_id', user.id);
       if (error) {
         setPosts((prev) =>
           prev.map((p) => (p.id === post.id ? { ...p, commentsDisabled: post.commentsDisabled } : p)),
         );
+        Alert.alert('Yorum ayarı güncellenemedi', error.message);
       }
     },
     [user],
@@ -149,7 +147,7 @@ export default function Home() {
 
   const toggleLikeCount = useCallback(
     async (post: PostView) => {
-      if (!user) return;
+      if (!user || post.author_id !== user.id) return;
       const nextHide = !post.hideLikeCount;
       setPosts((prev) =>
         prev.map((p) => (p.id === post.id ? { ...p, hideLikeCount: nextHide } : p)),
@@ -157,18 +155,24 @@ export default function Home() {
       const { error } = await supabase
         .from('posts')
         .update({ hide_like_count: nextHide })
-        .eq('id', post.id);
+        .eq('id', post.id)
+        .eq('author_id', user.id);
       if (error) {
         setPosts((prev) =>
           prev.map((p) => (p.id === post.id ? { ...p, hideLikeCount: post.hideLikeCount } : p)),
         );
+        Alert.alert('Beğeni ayarı güncellenemedi', error.message);
       }
     },
     [user],
   );
 
   const changeCommentCount = useCallback((postId: string, delta: number) => {
-    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, commentCount: p.commentCount + delta } : p)));
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, commentCount: Math.max(0, p.commentCount + delta) } : p,
+      ),
+    );
   }, []);
 
   const openComments = useCallback((p: PostView) => setCommentPostId(p.id), []);
@@ -188,29 +192,35 @@ export default function Home() {
     <SafeAreaView edges={['top']} className="flex-1 bg-white dark:bg-gray-900">
       <View className="px-5 pt-2">
         <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-2xl font-extrabold text-gray-900 dark:text-white">Campus Connect</Text>
-          <Pressable
-            onPress={() => setComposerOpen(true)}
-            className="h-10 w-10 items-center justify-center rounded-full bg-primary-500"
-          >
-            <Plus size={22} color="#fff" />
-          </Pressable>
-        </View>
-
-        <View className="flex-row items-center rounded-xl bg-gray-100 dark:bg-gray-800 px-4 py-3">
-          <Search size={20} className="text-gray-500 dark:text-gray-400" />
-          <TextInput
-            placeholder="Gönderi veya kullanıcı ara..."
-            placeholderTextColor="#9ca3af"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            className="flex-1 ml-3 text-base text-gray-900 dark:text-white"
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')} className="ml-2">
-              <X size={18} className="text-gray-500 dark:text-gray-400" />
+          <Text className="text-2xl font-extrabold text-gray-900 dark:text-white">KampüsHub</Text>
+          <View className="flex-row items-center gap-3">
+            <Pressable
+              onPress={() => router.push('/search')}
+              accessibilityLabel="Arkadaş bul"
+              className="h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 shadow-sm dark:bg-violet-950"
+            >
+              <UserPlus size={21} color="#7c3aed" strokeWidth={2.5} />
             </Pressable>
-          )}
+            <Pressable
+              onPress={() => router.push('/notifications')}
+              accessibilityLabel="Bildirimler"
+              className="h-11 w-11 items-center justify-center rounded-2xl bg-primary-500 shadow-sm"
+            >
+              <BellRing size={21} color="#ffffff" strokeWidth={2.5} />
+              {unreadCount > 0 ? (
+                <View className="absolute -right-1.5 -top-1.5 min-w-5 items-center rounded-full border-2 border-white bg-pink-500 px-1 dark:border-gray-900">
+                  <Text className="text-[10px] font-extrabold text-white">{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+            <Pressable
+              onPress={() => setComposerOpen(true)}
+              accessibilityLabel="Gönderi oluştur"
+              className="h-11 w-11 items-center justify-center rounded-2xl bg-gray-900 shadow-sm dark:bg-white"
+            >
+              <Plus size={23} color="#0ea5e9" strokeWidth={2.8} />
+            </Pressable>
+          </View>
         </View>
       </View>
 
@@ -218,16 +228,12 @@ export default function Home() {
         <ActivityIndicator className="mt-10" color="#0ea5e9" />
       ) : (
         <FlatList
-          data={filteredPosts.filter((p) => !p.is_archived)}
+          data={posts.filter((p) => !p.is_archived)}
           keyExtractor={(p) => p.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListHeaderComponent={<StoriesBar ref={storiesRef} />}
           ListEmptyComponent={
-            searchQuery ? (
-              <EmptyState title="Sonuç bulunamadı" hint="Farklı bir arama terimi deneyin." />
-            ) : (
-              <EmptyState title="Henüz gönderi yok" hint="Sağ üstteki + ile ilk gönderiyi sen paylaş." />
-            )
+            <EmptyState title={t('noPosts')} hint={t('firstPostHint')} />
           }
           renderItem={({ item }) => (
             <PostCard
@@ -248,7 +254,7 @@ export default function Home() {
       <CommentsSheet postId={commentPostId} onClose={() => setCommentPostId(null)} onCountChange={changeCommentCount} />
       <ShareSheet
         attachment={attachment}
-        shareText={attachment ? `${attachment.title}\n${attachment.subtitle ?? ''}\nCampus Connect` : ''}
+        shareText={attachment ? `${attachment.title}\n${attachment.subtitle ?? ''}\nKampüsHub` : ''}
         onClose={() => setShareTarget(null)}
       />
     </SafeAreaView>

@@ -70,7 +70,7 @@ export default function RegisterScreen() {
             Kayıt Ol
           </Text>
           <Text className={`text-base ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-            Campus Connect'a katıl
+            KampüsHub'a katıl
           </Text>
         </View>
 

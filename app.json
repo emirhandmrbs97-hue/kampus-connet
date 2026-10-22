@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Campus Connect",
+    "name": "KampüsHub",
     "slug": "campus-connect",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,12 +14,13 @@
     "android": {
       "package": "com.campusconnect.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#070C36",
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -28,12 +29,28 @@
     "plugins": [
       "expo-router",
       "expo-sqlite",
+      "expo-notifications",
       [
         "expo-image-picker",
         {
           "photosPermission": "Profil fotoğrafı seçmek için galerinize erişim gerekir."
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#070C36",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 250
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8dfd1a64-b6f3-4ca7-a6bf-f88c7781591d"
+      }
+    },
+    "owner": "sansar97"
   }
 }

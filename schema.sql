@@ -32,8 +32,12 @@ create table if not exists public.posts (
   media_type text check (media_type in ('image','pdf')),
   file_name text,
   created_at timestamptz not null default now(),
+  comments_disabled boolean not null default false,
+  hide_like_count boolean not null default false,
   check (body <> '' or media_url is not null)
 );
+alter table public.posts add column if not exists comments_disabled boolean not null default false;
+alter table public.posts add column if not exists hide_like_count boolean not null default false;
 
 create table if not exists public.likes (
   post_id uuid not null references public.posts(id) on delete cascade,
@@ -47,8 +51,26 @@ create table if not exists public.comments (
   post_id uuid not null references public.posts(id) on delete cascade,
   author_id uuid not null references public.profiles(id) on delete cascade,
   body text not null check (length(body) > 0),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  is_edited boolean not null default false
 );
+alter table public.comments add column if not exists updated_at timestamptz not null default now();
+alter table public.comments add column if not exists is_edited boolean not null default false;
+
+create or replace function public.set_comment_updated_at()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  new.updated_at := now();
+  if new.body is distinct from old.body then
+    new.is_edited := true;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists comments_set_updated_at on public.comments;
+create trigger comments_set_updated_at before update on public.comments
+  for each row execute function public.set_comment_updated_at();
 
 create table if not exists public.stories (
   id uuid primary key default gen_random_uuid(),
@@ -69,6 +91,35 @@ create table if not exists public.listings (
   status text not null default 'active' check (status in ('active','sold')),
   created_at timestamptz not null default now()
 );
+alter table public.listings add column if not exists pdf_url text;
+alter table public.listings add column if not exists pdf_file_name text;
+alter table public.listings add column if not exists pdf_size bigint;
+alter table public.listings add column if not exists university_name text;
+alter table public.listings add column if not exists department_name text;
+alter table public.listings add column if not exists grade_level text;
+alter table public.listings drop constraint if exists listings_status_check;
+alter table public.listings add constraint listings_status_check check (status in ('active','sold','archived'));
+
+insert into storage.buckets (id, name, public, allowed_mime_types)
+values ('marketplace-pdfs', 'marketplace-pdfs', true, array['application/pdf'])
+on conflict (id) do update
+set public = excluded.public,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists marketplace_pdfs_upload on storage.objects;
+create policy marketplace_pdfs_upload on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'marketplace-pdfs'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+drop policy if exists marketplace_pdfs_delete on storage.objects;
+create policy marketplace_pdfs_delete on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'marketplace-pdfs'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 create table if not exists public.offers (
   id uuid primary key default gen_random_uuid(),
@@ -207,6 +258,10 @@ create policy posts_select on public.posts for select to authenticated using (
 );
 drop policy if exists posts_insert on public.posts;
 create policy posts_insert on public.posts for insert to authenticated with check (author_id = auth.uid());
+drop policy if exists posts_update on public.posts;
+create policy posts_update on public.posts for update to authenticated
+  using (author_id = auth.uid())
+  with check (author_id = auth.uid());
 drop policy if exists posts_delete on public.posts;
 create policy posts_delete on public.posts for delete to authenticated using (author_id = auth.uid());
 
@@ -222,9 +277,22 @@ create policy likes_delete on public.likes for delete to authenticated using (us
 drop policy if exists comments_select on public.comments;
 create policy comments_select on public.comments for select to authenticated using (exists (select 1 from public.posts p where p.id = post_id));
 drop policy if exists comments_insert on public.comments;
-create policy comments_insert on public.comments for insert to authenticated with check (author_id = auth.uid() and exists (select 1 from public.posts p where p.id = post_id));
+create policy comments_insert on public.comments for insert to authenticated with check (
+  author_id = auth.uid()
+  and exists (
+    select 1 from public.posts p
+    where p.id = post_id and p.comments_disabled = false
+  )
+);
 drop policy if exists comments_delete on public.comments;
-create policy comments_delete on public.comments for delete to authenticated using (author_id = auth.uid());
+create policy comments_delete on public.comments for delete to authenticated using (
+  author_id = auth.uid()
+  or exists (select 1 from public.posts p where p.id = post_id and p.author_id = auth.uid())
+);
+drop policy if exists comments_update on public.comments;
+create policy comments_update on public.comments for update to authenticated
+  using (author_id = auth.uid())
+  with check (author_id = auth.uid());
 
 -- stories
 drop policy if exists stories_select on public.stories;
@@ -285,3 +353,5 @@ do $$ begin
   alter publication supabase_realtime add table public.messages;
 exception when duplicate_object then null;
 end $$;
+
+notify pgrst, 'reload schema';

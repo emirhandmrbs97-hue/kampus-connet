@@ -1,4 +1,5 @@
 import { useColorScheme } from 'nativewind';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,
   useCallback,
@@ -20,35 +21,35 @@ type ThemeContextValue = {
 const KEY = 'campus-theme-mode';
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-function readSaved(): ThemeMode {
-  try {
-    const v = localStorage.getItem(KEY);
-    if (v === 'light' || v === 'dark' || v === 'system') return v;
-  } catch {
-    // storage unavailable
-  }
-  return 'system';
-}
-
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { colorScheme, setColorScheme } = useColorScheme();
-  const [mode, setModeState] = useState<ThemeMode>(readSaved);
+  const [mode, setModeState] = useState<ThemeMode>('system');
 
   useEffect(() => {
-    setColorScheme(mode);
-    // apply the saved mode once on startup
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let active = true;
+    void AsyncStorage.getItem(KEY)
+      .then((saved) => {
+        const next: ThemeMode =
+          saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
+        if (!active) return;
+        setModeState(next);
+        setColorScheme(next);
+      })
+      .catch((error: unknown) => {
+        console.error('Tema tercihi yüklenemedi:', error);
+      });
+    return () => {
+      active = false;
+    };
+  }, [setColorScheme]);
 
   const setMode = useCallback(
     (next: ThemeMode) => {
       setModeState(next);
       setColorScheme(next);
-      try {
-        localStorage.setItem(KEY, next);
-      } catch {
-        // ignore
-      }
+      void AsyncStorage.setItem(KEY, next).catch((error: unknown) => {
+        console.error('Tema tercihi kaydedilemedi:', error);
+      });
     },
     [setColorScheme],
   );

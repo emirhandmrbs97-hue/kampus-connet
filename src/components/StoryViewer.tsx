@@ -1,8 +1,10 @@
 import { X } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Image, Modal, Pressable, StatusBar, Text, View } from 'react-native';
+import { Animated, Modal, Pressable, StatusBar, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { StorageImage } from '@/components/StorageImage';
 import { Avatar } from '@/components/ui';
 import { timeAgo } from '@/lib/format';
 import type { StoryGroup } from '@/types';
@@ -73,7 +75,7 @@ export function StoryViewer({
     <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <StatusBar hidden />
       <View className="flex-1 bg-black">
-        <Image source={{ uri: item.media_url }} resizeMode="contain" className="absolute inset-0 h-full w-full" />
+        <StorageImage uri={item.media_url} resizeMode="contain" className="absolute inset-0 h-full w-full" />
 
         <View className="absolute inset-0 flex-row">
           <Pressable className="flex-1" onPress={goPrev} />
@@ -99,8 +101,12 @@ export function StoryViewer({
             ))}
           </View>
           <View className="mt-3 flex-row items-center">
-            <Avatar uri={group.author.avatar_url} name={group.author.full_name} size={36} />
-            <Text className="ml-2 font-semibold text-white">{group.author.username}</Text>
+            <Pressable onPress={() => router.push({ pathname: '/profile/[id]', params: { id: group.author.id } })}>
+              <Avatar uri={group.author.avatar_url} name={group.author.full_name} size={36} />
+            </Pressable>
+            <Pressable onPress={() => router.push({ pathname: '/profile/[id]', params: { id: group.author.id } })}>
+              <Text className="ml-2 font-semibold text-white">{group.author.username}</Text>
+            </Pressable>
             <Text className="ml-2 text-xs text-white/70">{timeAgo(item.created_at)}</Text>
             <Pressable onPress={onClose} hitSlop={14} className="ml-auto">
               <X size={26} color="#fff" />

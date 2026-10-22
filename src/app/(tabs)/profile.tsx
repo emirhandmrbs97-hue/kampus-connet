@@ -1,24 +1,24 @@
 import { Camera, Edit, Grid, ImageIcon, Settings } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Image, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
-import { ActionSheet, Avatar, Button, Field, FullScreenImage, Sheet } from '@/components/ui';
+import { ActionSheet, Avatar, Button, FullScreenImage, Sheet } from '@/components/ui';
+import { StorageImage } from '@/components/StorageImage';
 import { StoryViewer } from '@/components/StoryViewer';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { useProfile } from '@/context/ProfileContext';
 import { supabase } from '@/lib/supabase';
 import { pickImage } from '@/services/mediaPicker';
-import { countRows } from '@/services/profiles';
+import { countRows, fetchProfiles } from '@/services/profiles';
 import { uploadMedia } from '@/services/storageService';
 import type { PostRow, PostView, StoryGroup, StoryRow } from '@/types';
-import { fetchProfiles } from '@/services/profiles';
-
-
 
 export default function Profile() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { profile, updateProfile } = useProfile();
 
   const [stats, setStats] = useState({ posts: 0, followers: 0, following: 0 });
@@ -28,6 +28,10 @@ export default function Profile() {
   const [refreshing, setRefreshing] = useState(false);
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [fullScreenImageVisible, setFullScreenImageVisible] = useState(false);
+  const [bioEditorVisible, setBioEditorVisible] = useState(false);
+  const [bioDraft, setBioDraft] = useState('');
+  const [bioError, setBioError] = useState<string | null>(null);
+  const [savingBio, setSavingBio] = useState(false);
   const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([]);
   const [viewerStart, setViewerStart] = useState<number | null>(null);
 
@@ -113,9 +117,42 @@ export default function Profile() {
   const changeAvatar = async () => {
     const picked = await pickImage({ square: true });
     if (!picked) return;
-    const media = await uploadMedia(picked.uri, { kind: 'image', folder: 'avatars' });
+    const media = await uploadMedia(picked.uri, {
+      kind: 'image',
+      folder: 'avatars',
+      fileName: picked.name,
+      file: picked.file,
+    });
     const err = await updateProfile({ avatar_url: media.url });
     if (err) Alert.alert('Profil resmi güncellenemedi', err);
+  };
+
+  const openBioEditor = () => {
+    setBioDraft(profile?.bio ?? '');
+    setBioError(null);
+    setBioEditorVisible(true);
+  };
+
+  const saveBio = async () => {
+    const bio = bioDraft.trim();
+    if (bio.length > 150) {
+      setBioError('Biyografi en fazla 150 karakter olabilir.');
+      return;
+    }
+
+    setSavingBio(true);
+    try {
+      const error = await updateProfile({ bio: bio || null });
+      if (error) {
+        setBioError(error);
+        return;
+      }
+      setBioEditorVisible(false);
+    } catch (error) {
+      setBioError(error instanceof Error ? error.message : 'Biyografi kaydedilemedi.');
+    } finally {
+      setSavingBio(false);
+    }
   };
 
   const handleAvatarPress = () => {
@@ -145,7 +182,7 @@ export default function Profile() {
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white dark:bg-gray-900">
       <View className="flex-row items-center justify-between px-5 pt-2">
-        <Text className="text-2xl font-extrabold text-gray-900 dark:text-white">Profil</Text>
+        <Text className="text-2xl font-extrabold text-gray-900 dark:text-white">{t('profile')}</Text>
         <Pressable onPress={() => router.push('/settings')} className="h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
           <Settings size={22} className="text-gray-600 dark:text-gray-300" />
         </Pressable>
@@ -175,23 +212,40 @@ export default function Profile() {
                 <View className="mt-3 flex-row gap-6">
                   <View>
                     <Text className="text-lg font-bold text-gray-900 dark:text-white">{stats.posts}</Text>
-                    <Text className="text-sm text-gray-500 dark:text-gray-400">Gönderi</Text>
+                    <Text className="text-sm text-gray-500 dark:text-gray-400">{t('postCount')}</Text>
                   </View>
                   <View>
                     <Text className="text-lg font-bold text-gray-900 dark:text-white">{stats.followers}</Text>
-                    <Text className="text-sm text-gray-500 dark:text-gray-400">Takipçi</Text>
+                    <Text className="text-sm text-gray-500 dark:text-gray-400">{t('followerCount')}</Text>
                   </View>
                   <View>
                     <Text className="text-lg font-bold text-gray-900 dark:text-white">{stats.following}</Text>
-                    <Text className="text-sm text-gray-500 dark:text-gray-400">Takip</Text>
+                    <Text className="text-sm text-gray-500 dark:text-gray-400">{t('followingCount')}</Text>
                   </View>
                 </View>
               </View>
             </View>
 
+            {profile?.bio ? (
+              <Text className="mt-4 text-sm leading-5 text-gray-700 dark:text-gray-300">
+                {profile.bio}
+              </Text>
+            ) : null}
+
+            <Pressable
+              onPress={openBioEditor}
+              accessibilityRole="button"
+              className="mt-4 flex-row items-center justify-center rounded-xl border border-gray-200 py-2.5 dark:border-gray-700"
+            >
+              <Edit size={16} color="#6b7280" />
+              <Text className="ml-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                {t('editProfile')}
+              </Text>
+            </Pressable>
+
             <View className="mt-6 flex-row items-center border-b border-gray-200 dark:border-gray-700 pb-3">
               <View className="flex-1">
-                <Text className="text-base font-semibold text-gray-900 dark:text-white">Gönderiler</Text>
+                <Text className="text-base font-semibold text-gray-900 dark:text-white">{t('posts')}</Text>
               </View>
               <Pressable onPress={() => {}}>
                 <Grid size={20} className="text-gray-600 dark:text-gray-300" />
@@ -200,7 +254,7 @@ export default function Profile() {
 
             {loadingPosts && (
               <View className="mt-10 items-center">
-                <Text className="text-gray-500 dark:text-gray-400">Yükleniyor...</Text>
+                <Text className="text-gray-500 dark:text-gray-400">{t('loading')}</Text>
               </View>
             )}
           </View>
@@ -208,15 +262,15 @@ export default function Profile() {
         ListEmptyComponent={
           !loadingPosts ? (
             <View className="mt-10 items-center">
-              <Text className="text-gray-500 dark:text-gray-400">Henüz gönderi yok</Text>
+              <Text className="text-gray-500 dark:text-gray-400">{t('noPosts')}</Text>
             </View>
           ) : null
         }
         renderItem={({ item }) => (
           <View className="m-0.5 aspect-square flex-1">
             {item.media_url ? (
-              <Image
-                source={{ uri: item.media_url }}
+              <StorageImage
+                uri={item.media_url}
                 className="h-full w-full"
                 resizeMode="cover"
               />
@@ -237,12 +291,12 @@ export default function Profile() {
         onClose={() => setActionSheetVisible(false)}
         options={[
           {
-            label: 'Hikayeyi Görüntüle',
+            label: t('viewStory'),
             icon: <Camera size={20} color="#0ea5e9" />,
             onPress: handleViewStory,
           },
           {
-            label: 'Profil Fotoğrafını Gör',
+            label: t('viewProfilePhoto'),
             icon: <ImageIcon size={20} color="#0ea5e9" />,
             onPress: handleViewProfilePhoto,
           },
@@ -262,6 +316,36 @@ export default function Profile() {
         onClose={closeStoryViewer}
         onSeen={() => {}}
       />
+
+      <Sheet
+        visible={bioEditorVisible}
+        onClose={() => setBioEditorVisible(false)}
+        title={t('editBio')}
+      >
+        <TextInput
+          value={bioDraft}
+          onChangeText={(value) => {
+            setBioDraft(value);
+            setBioError(null);
+          }}
+          placeholder={t('bioPlaceholder')}
+          placeholderTextColor="#9ca3af"
+          multiline
+          maxLength={150}
+          textAlignVertical="top"
+          className="min-h-28 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-base text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+        />
+        <Text className="mt-2 text-right text-xs text-gray-500 dark:text-gray-400">
+          {bioDraft.length}/150
+        </Text>
+        {bioError ? <Text className="mt-2 text-sm text-red-600">{bioError}</Text> : null}
+        <Button
+          title={t('save')}
+          onPress={saveBio}
+          loading={savingBio}
+          className="mt-4"
+        />
+      </Sheet>
     </SafeAreaView>
   );
 }

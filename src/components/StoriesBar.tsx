@@ -1,10 +1,12 @@
-import { Camera, ImageIcon, Plus } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
+import { router } from 'expo-router';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 
-import { ActionSheet, Avatar, FullScreenImage } from '@/components/ui';
+import { Avatar } from '@/components/ui';
 import { StoryViewer } from '@/components/StoryViewer';
 import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { useProfile } from '@/context/ProfileContext';
 import { supabase } from '@/lib/supabase';
 import { pickImage } from '@/services/mediaPicker';
@@ -16,13 +18,11 @@ export type StoriesBarHandle = { reload: () => Promise<void> };
 
 export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_props, ref) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { profile } = useProfile();
   const [groups, setGroups] = useState<StoryGroup[]>([]);
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [viewerStart, setViewerStart] = useState<number | null>(null);
-  const [actionSheetVisible, setActionSheetVisible] = useState(false);
-  const [fullScreenImageVisible, setFullScreenImageVisible] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
 
   const reload = useCallback(async () => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -58,7 +58,12 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
     const picked = await pickImage();
     if (!picked) return;
     try {
-      const media = await uploadMedia(picked.uri, { kind: 'image', folder: 'stories' });
+      const media = await uploadMedia(picked.uri, {
+        kind: 'image',
+        folder: 'stories',
+        fileName: picked.name,
+        file: picked.file,
+      });
       const { error } = await supabase
         .from('stories')
         .insert({ author_id: user.id, media_url: media.url });
@@ -73,33 +78,6 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
   const markSeen = useCallback((authorId: string) => {
     setSeen((prev) => new Set(prev).add(authorId));
   }, []);
-
-  const handleAvatarPress = (author: Profile) => {
-    setSelectedProfile(author);
-    const hasStory = groups.some((g) => g.author.id === author.id);
-    if (hasStory && author.avatar_url) {
-      setActionSheetVisible(true);
-    } else if (author.avatar_url) {
-      setFullScreenImageVisible(true);
-    }
-  };
-
-  const handleViewStory = () => {
-    setActionSheetVisible(false);
-    if (selectedProfile) {
-      const index = groups.findIndex((g) => g.author.id === selectedProfile.id);
-      if (index !== -1) {
-        setViewerStart(index);
-      }
-    }
-  };
-
-  const handleViewProfilePhoto = () => {
-    setActionSheetVisible(false);
-    if (selectedProfile?.avatar_url) {
-      setFullScreenImageVisible(true);
-    }
-  };
 
   const ownGroup = groups.find((g) => g.author.id === user?.id);
   const others = groups.filter((g) => g.author.id !== user?.id);
@@ -117,13 +95,20 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
     label: string;
     badge?: boolean;
   }) => (
-    <Pressable onPress={onPress} className="mr-4 w-[68px] items-center">
+    <View className="mr-4 w-[68px] items-center">
       <View
         className={`rounded-full border-2 p-[2px] ${
           isSeen ? 'border-gray-300 dark:border-gray-600' : 'border-primary-500'
         }`}
       >
-        <Avatar uri={author.avatar_url} name={author.full_name} size={56} />
+        <Pressable
+          onPress={() => {
+            if ('id' in author) router.push({ pathname: '/profile/[id]', params: { id: author.id } });
+          }}
+          accessibilityRole="link"
+        >
+          <Avatar uri={author.avatar_url} name={author.full_name} size={56} />
+        </Pressable>
         {badge ? (
           <Pressable
             onPress={addStory}
@@ -134,10 +119,12 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
           </Pressable>
         ) : null}
       </View>
-      <Text numberOfLines={1} className="mt-1.5 text-xs text-gray-700 dark:text-gray-300">
-        {label}
-      </Text>
-    </Pressable>
+      <Pressable onPress={onPress}>
+        <Text numberOfLines={1} className="mt-1.5 text-xs text-gray-700 dark:text-gray-300">
+          {label}
+        </Text>
+      </Pressable>
+    </View>
   );
 
   const data: StoryGroup[] = others;
@@ -155,7 +142,7 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
             <Ring
               author={profile}
               isSeen={false}
-              label="Hikayen"
+              label={t('yourStory')}
               badge
               onPress={() => (ownGroup ? setViewerStart(0) : addStory())}
             />
@@ -166,7 +153,10 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
             author={item.author}
             isSeen={seen.has(item.author.id)}
             label={item.author.username}
-            onPress={() => handleAvatarPress(item.author)}
+            onPress={() => {
+              const index = groups.findIndex((group) => group.author.id === item.author.id);
+              if (index !== -1) setViewerStart(index);
+            }}
           />
         )}
       />
@@ -178,28 +168,6 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
         onSeen={markSeen}
       />
 
-      <ActionSheet
-        visible={actionSheetVisible}
-        onClose={() => setActionSheetVisible(false)}
-        options={[
-          {
-            label: 'Hikayeyi Görüntüle',
-            icon: <Camera size={20} color="#0ea5e9" />,
-            onPress: handleViewStory,
-          },
-          {
-            label: 'Profil Fotoğrafını Gör',
-            icon: <ImageIcon size={20} color="#0ea5e9" />,
-            onPress: handleViewProfilePhoto,
-          },
-        ]}
-      />
-
-      <FullScreenImage
-        visible={fullScreenImageVisible}
-        onClose={() => setFullScreenImageVisible(false)}
-        uri={selectedProfile?.avatar_url ?? null}
-      />
     </View>
   );
 });

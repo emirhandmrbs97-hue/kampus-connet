@@ -2,10 +2,9 @@ import { ChevronLeft, UserX } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-
 import { Avatar, EmptyState } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
+import { goBack } from '@/lib/navigation';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
 
@@ -66,7 +65,7 @@ export default function BlockedUsers() {
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white dark:bg-gray-900">
       <View className="flex-row items-center px-5 pt-2 mb-4">
-        <Pressable onPress={() => router.back()} className="mr-4">
+        <Pressable onPress={() => goBack()} className="mr-4">
           <ChevronLeft size={24} color="#374151" className="dark:text-gray-300" />
         </Pressable>
         <Text className="text-2xl font-extrabold text-gray-900 dark:text-white">Engellenen Kullanıcılar</Text>
