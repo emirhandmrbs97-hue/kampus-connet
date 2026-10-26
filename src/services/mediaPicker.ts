@@ -16,7 +16,7 @@ export async function pickImage(
   options?: { square?: boolean },
 ): Promise<{ uri: string; file?: Blob; name?: string } | null> {
   const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    mediaTypes: ['images'],
     allowsEditing: !!options?.square,
     aspect: options?.square ? [1, 1] : undefined,
     quality: 0.7,
