@@ -82,8 +82,14 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
     setSeen((prev) => new Set(prev).add(authorId));
   }, []);
 
-  const handleAvatarPress = (author: Profile, hasStory: boolean) => {
-    if (hasStory) {
+  const handleAvatarPress = (author: Profile, hasStory: boolean, isOwn: boolean) => {
+    if (isOwn) {
+      if (hasStory) {
+        setViewerStart(0);
+      } else {
+        addStory();
+      }
+    } else if (hasStory) {
       setSelectedProfile(author);
       setActionSheetVisible(true);
     } else if (author.avatar_url) {
@@ -117,6 +123,7 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
     label,
     badge,
     hasStory,
+    isOwn,
   }: {
     author: Profile | { full_name: string; avatar_url: string | null };
     isSeen?: boolean;
@@ -124,6 +131,7 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
     label: string;
     badge?: boolean;
     hasStory?: boolean;
+    isOwn?: boolean;
   }) => (
     <View className="mr-4 w-[68px] items-center">
       <View
@@ -133,7 +141,7 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
       >
         <Pressable
           onPress={() => {
-            if ('id' in author) handleAvatarPress(author, hasStory || false);
+            if ('id' in author) handleAvatarPress(author, hasStory || false, isOwn || false);
           }}
           accessibilityRole="link"
         >
@@ -174,6 +182,8 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
               isSeen={false}
               label={t('yourStory')}
               badge
+              hasStory={!!ownGroup}
+              isOwn={true}
               onPress={() => (ownGroup ? setViewerStart(0) : addStory())}
             />
           ) : null

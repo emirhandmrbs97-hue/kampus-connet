@@ -184,7 +184,7 @@ export default function Profile() {
 
   const handleAvatarPress = () => {
     if (hasStory) {
-      setActionSheetVisible(true);
+      setViewerStart(0);
     } else {
       openProfileEditor();
     }
