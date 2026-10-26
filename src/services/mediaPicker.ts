@@ -16,11 +16,11 @@ export async function pickImage(
   options?: { square?: boolean },
 ): Promise<{ uri: string; file?: Blob; name?: string } | null> {
   const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ['images'],
-    base64: Platform.OS === 'web',
-    quality: 0.7,
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
     allowsEditing: !!options?.square,
     aspect: options?.square ? [1, 1] : undefined,
+    quality: 0.7,
+    base64: Platform.OS === 'web',
   });
   if (result.canceled || !result.assets[0]) return null;
   return {
