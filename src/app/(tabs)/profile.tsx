@@ -29,9 +29,11 @@ export default function Profile() {
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [fullScreenImageVisible, setFullScreenImageVisible] = useState(false);
   const [bioEditorVisible, setBioEditorVisible] = useState(false);
+  const [profileEditorVisible, setProfileEditorVisible] = useState(false);
   const [bioDraft, setBioDraft] = useState('');
   const [bioError, setBioError] = useState<string | null>(null);
   const [savingBio, setSavingBio] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
   const [storyGroups, setStoryGroups] = useState<StoryGroup[]>([]);
   const [viewerStart, setViewerStart] = useState<number | null>(null);
 
@@ -155,12 +157,42 @@ export default function Profile() {
     }
   };
 
+  const openProfileEditor = () => {
+    setProfileEditorVisible(true);
+  };
+
+  const saveAvatar = async () => {
+    const picked = await pickImage({ square: true });
+    if (!picked) return;
+    setSavingAvatar(true);
+    try {
+      const media = await uploadMedia(picked.uri, {
+        kind: 'image',
+        folder: 'avatars',
+        fileName: picked.name,
+        file: picked.file,
+      });
+      const err = await updateProfile({ avatar_url: media.url });
+      if (err) Alert.alert('Profil resmi güncellenemedi', err);
+      else setProfileEditorVisible(false);
+    } catch (error) {
+      Alert.alert('Profil resmi güncellenemedi', error instanceof Error ? error.message : 'Bir hata oluştu.');
+    } finally {
+      setSavingAvatar(false);
+    }
+  };
+
   const handleAvatarPress = () => {
     if (hasStory) {
       setActionSheetVisible(true);
     } else if (profile?.avatar_url) {
       setFullScreenImageVisible(true);
     }
+  };
+
+  const changeAvatarFromEditor = async () => {
+    setProfileEditorVisible(false);
+    await saveAvatar();
   };
 
   const handleViewStory = () => {
@@ -197,11 +229,8 @@ export default function Profile() {
           <View className="px-5 pt-4 pb-10">
             <View className="flex-row items-start">
               <View className="mr-4">
-                <Pressable onPress={handleAvatarPress}>
+                <Pressable onPress={openProfileEditor}>
                   <Avatar uri={profile?.avatar_url} name={profile?.full_name} size={96} hasStory={hasStory} />
-                </Pressable>
-                <Pressable onPress={changeAvatar} className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-primary-500 dark:border-gray-900" style={{ right: -4, bottom: -4 }}>
-                  <Camera size={15} color="#fff" />
                 </Pressable>
               </View>
               <View className="flex-1">
@@ -233,13 +262,13 @@ export default function Profile() {
             ) : null}
 
             <Pressable
-              onPress={openBioEditor}
+              onPress={openProfileEditor}
               accessibilityRole="button"
               className="mt-4 flex-row items-center justify-center rounded-xl border border-gray-200 py-2.5 dark:border-gray-700"
             >
               <Edit size={16} color="#6b7280" />
               <Text className="ml-2 text-sm font-semibold text-gray-800 dark:text-gray-100">
-                {t('editProfile')}
+                Profil Düzenle
               </Text>
             </Pressable>
 
@@ -345,6 +374,40 @@ export default function Profile() {
           loading={savingBio}
           className="mt-4"
         />
+      </Sheet>
+
+      <Sheet
+        visible={profileEditorVisible}
+        onClose={() => setProfileEditorVisible(false)}
+        title="Profil Düzenle"
+      >
+        <View className="mb-4">
+          <Text className="mb-2 text-base font-semibold text-gray-900 dark:text-white">Profil Resmi</Text>
+          <Pressable
+            onPress={saveAvatar}
+            className="flex-row items-center justify-center rounded-xl border border-gray-200 py-3 dark:border-gray-700"
+          >
+            <ImageIcon size={20} color="#6b7280" />
+            <Text className="ml-2 text-base font-semibold text-gray-800 dark:text-gray-100">
+              Profil Resmini Değiştir
+            </Text>
+          </Pressable>
+        </View>
+        <View className="mb-4">
+          <Text className="mb-2 text-base font-semibold text-gray-900 dark:text-white">Biyografi</Text>
+          <Pressable
+            onPress={() => {
+              setProfileEditorVisible(false);
+              openBioEditor();
+            }}
+            className="flex-row items-center justify-center rounded-xl border border-gray-200 py-3 dark:border-gray-700"
+          >
+            <Edit size={20} color="#6b7280" />
+            <Text className="ml-2 text-base font-semibold text-gray-800 dark:text-gray-100">
+              Biyografiyi Düzenle
+            </Text>
+          </Pressable>
+        </View>
       </Sheet>
     </SafeAreaView>
   );
