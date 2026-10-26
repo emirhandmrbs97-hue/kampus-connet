@@ -1,4 +1,4 @@
-import { Camera, Edit, Grid, ImageIcon, Settings } from 'lucide-react-native';
+import { Camera, Edit, Grid, ImageIcon, Settings, User } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -185,8 +185,8 @@ export default function Profile() {
   const handleAvatarPress = () => {
     if (hasStory) {
       setActionSheetVisible(true);
-    } else if (profile?.avatar_url) {
-      setFullScreenImageVisible(true);
+    } else {
+      openProfileEditor();
     }
   };
 
@@ -207,6 +207,11 @@ export default function Profile() {
     if (profile?.avatar_url) {
       setFullScreenImageVisible(true);
     }
+  };
+
+  const handleEditProfile = () => {
+    setActionSheetVisible(false);
+    openProfileEditor();
   };
 
   const closeStoryViewer = () => setViewerStart(null);
@@ -328,6 +333,11 @@ export default function Profile() {
             label: t('viewProfilePhoto'),
             icon: <ImageIcon size={20} color="#0ea5e9" />,
             onPress: handleViewProfilePhoto,
+          },
+          {
+            label: 'Profili Düzenle',
+            icon: <User size={20} color="#0ea5e9" />,
+            onPress: handleEditProfile,
           },
         ]}
       />

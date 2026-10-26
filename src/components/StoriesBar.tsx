@@ -1,9 +1,9 @@
-import { Plus } from 'lucide-react-native';
+import { Camera, ImageIcon, Plus } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { Alert, FlatList, Pressable, Text, View } from 'react-native';
 
-import { Avatar } from '@/components/ui';
+import { ActionSheet, Avatar } from '@/components/ui';
 import { StoryViewer } from '@/components/StoryViewer';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -23,6 +23,9 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
   const [groups, setGroups] = useState<StoryGroup[]>([]);
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [viewerStart, setViewerStart] = useState<number | null>(null);
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [fullScreenImageVisible, setFullScreenImageVisible] = useState(false);
 
   const reload = useCallback(async () => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -79,6 +82,31 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
     setSeen((prev) => new Set(prev).add(authorId));
   }, []);
 
+  const handleAvatarPress = (author: Profile, hasStory: boolean) => {
+    if (hasStory) {
+      setSelectedProfile(author);
+      setActionSheetVisible(true);
+    } else if (author.avatar_url) {
+      setSelectedProfile(author);
+      setFullScreenImageVisible(true);
+    }
+  };
+
+  const handleViewStory = () => {
+    setActionSheetVisible(false);
+    if (selectedProfile) {
+      const index = groups.findIndex((g) => g.author.id === selectedProfile.id);
+      if (index !== -1) setViewerStart(index);
+    }
+  };
+
+  const handleViewProfilePhoto = () => {
+    setActionSheetVisible(false);
+    if (selectedProfile?.avatar_url) {
+      setFullScreenImageVisible(true);
+    }
+  };
+
   const ownGroup = groups.find((g) => g.author.id === user?.id);
   const others = groups.filter((g) => g.author.id !== user?.id);
 
@@ -88,12 +116,14 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
     onPress,
     label,
     badge,
+    hasStory,
   }: {
     author: Profile | { full_name: string; avatar_url: string | null };
     isSeen?: boolean;
     onPress: () => void;
     label: string;
     badge?: boolean;
+    hasStory?: boolean;
   }) => (
     <View className="mr-4 w-[68px] items-center">
       <View
@@ -103,7 +133,7 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
       >
         <Pressable
           onPress={() => {
-            if ('id' in author) router.push({ pathname: '/profile/[id]', params: { id: author.id } });
+            if ('id' in author) handleAvatarPress(author, hasStory || false);
           }}
           accessibilityRole="link"
         >
@@ -153,6 +183,7 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
             author={item.author}
             isSeen={seen.has(item.author.id)}
             label={item.author.username}
+            hasStory={true}
             onPress={() => {
               const index = groups.findIndex((group) => group.author.id === item.author.id);
               if (index !== -1) setViewerStart(index);
@@ -166,6 +197,23 @@ export const StoriesBar = forwardRef<StoriesBarHandle>(function StoriesBar(_prop
         startIndex={viewerStart ?? 0}
         onClose={closeViewer}
         onSeen={markSeen}
+      />
+
+      <ActionSheet
+        visible={actionSheetVisible}
+        onClose={() => setActionSheetVisible(false)}
+        options={[
+          {
+            label: 'Hikayeyi Görüntüle',
+            icon: <Camera size={20} color="#0ea5e9" />,
+            onPress: handleViewStory,
+          },
+          {
+            label: 'Profil Fotoğrafını Gör',
+            icon: <ImageIcon size={20} color="#0ea5e9" />,
+            onPress: handleViewProfilePhoto,
+          },
+        ]}
       />
 
     </View>
