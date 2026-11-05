@@ -1,0 +1,10 @@
+---
+description: Campus Connect project rules
+alwaysApply: true
+---
+
+Follow the instructions in AGENTS.md at the repository root. It is the single source of truth for Claude Code, Cursor and Windsurf.
+
+- Source code lives in `src/`; routes in `src/app/`. Import with the `@/` alias.
+- Styling uses NativeWind v4 (`className`). Do not mix with Tailwind v4.
+- Never commit `.env.local`. Supabase values come from `EXPO_PUBLIC_SUPABASE_*`.
