@@ -1,9 +1,10 @@
 import { X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Image, Modal, Pressable, StatusBar, Text, View } from 'react-native';
+import { Animated, Modal, Pressable, StatusBar, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/ui';
+import { StorageImage } from '@/components/StorageImage';
 import { timeAgo } from '@/lib/format';
 import type { StoryGroup } from '@/types';
 
@@ -73,7 +74,7 @@ export function StoryViewer({
     <Modal visible animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <StatusBar hidden />
       <View className="flex-1 bg-black">
-        <Image source={{ uri: item.media_url }} resizeMode="contain" className="absolute inset-0 h-full w-full" />
+        <StorageImage uri={item.media_url} resizeMode="contain" className="absolute inset-0 h-full w-full" />
 
         <View className="absolute inset-0 flex-row">
           <Pressable className="flex-1" onPress={goPrev} />

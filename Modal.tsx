@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal as RNModal, View, Text, TouchableOpacity, Pressable } from 'react-native';
 import { X } from 'lucide-react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from './ThemeContext';
 
 interface ModalProps {
   visible: boolean;

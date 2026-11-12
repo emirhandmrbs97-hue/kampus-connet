@@ -4,7 +4,7 @@
     "slug": "campus-connect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "campusconnect",
     "ios": {
@@ -15,15 +15,15 @@
       "package": "com.campusconnect.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./android-icon-foreground.png",
+        "backgroundImage": "./android-icon-background.png",
+        "monochromeImage": "./android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "bundler": "metro",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -32,6 +32,13 @@
         {
           "photosPermission": "Profil fotoğrafı seçmek için galerinize erişim gerekir.",
           "cameraPermission": "Fotoğraf çekmek için kameranıza erişim gerekir."
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
       ]
     ]

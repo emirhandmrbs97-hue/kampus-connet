@@ -1,10 +1,13 @@
 import { Tabs } from 'expo-router';
-import { Home, MessageCircle, ShoppingBag, User } from 'lucide-react-native';
+import { Home, ShoppingBag, User, VenetianMask } from 'lucide-react-native';
 
 import { useTheme } from '@/context/ThemeContext';
+import { useNotifications } from '@/context/NotificationContext';
+import { MessageIcon } from '@/components/MessageIcon';
 
 export default function TabsLayout() {
   const { isDark } = useTheme();
+  const { unreadCount, unreadMessageCount, clearUnreadMessages } = useNotifications();
 
   return (
     <Tabs
@@ -20,7 +23,12 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Ana sayfa', tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
+        options={{
+          title: 'Ana sayfa',
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
+          tabBarBadgeStyle: { backgroundColor: '#0ea5e9', color: '#fff' },
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+        }}
       />
       <Tabs.Screen
         name="marketplace"
@@ -28,7 +36,17 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="messages"
-        options={{ title: 'Mesajlar', tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} /> }}
+        listeners={{ tabPress: clearUnreadMessages }}
+        options={{
+          title: 'Mesajlar',
+          tabBarIcon: ({ color, size }) => (
+            <MessageIcon color={color} size={size} unreadCount={unreadMessageCount} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="confessions"
+        options={{ title: 'İtiraflar', tabBarIcon: ({ color, size }) => <VenetianMask color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="profile"

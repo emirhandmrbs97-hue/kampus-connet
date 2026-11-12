@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, TouchableOpacity, Image, Text } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { View, TouchableOpacity, Text } from 'react-native';
+import { useTheme } from './ThemeContext';
+import { StorageImage } from '@/components/StorageImage';
 
 interface StoryAvatarProps {
   uri?: string;
@@ -26,8 +27,8 @@ export const StoryAvatar: React.FC<StoryAvatarProps> = ({
       >
         <View className={`p-1 rounded-full ${isDark ? 'bg-gray-900' : 'bg-white'}`}>
           {uri ? (
-            <Image
-              source={{ uri }}
+            <StorageImage
+              uri={uri}
               className="w-16 h-16 rounded-full"
               resizeMode="cover"
             />

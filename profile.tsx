@@ -1,10 +1,11 @@
 import { router, useFocusEffect } from 'expo-router';
 import { Settings as SettingsIcon } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar, Button, EmptyState } from '@/components/ui';
+import { StorageImage } from '@/components/StorageImage';
 import { useAuth } from '@/context/AuthContext';
 import { useProfile } from '@/context/ProfileContext';
 import { timeAgo } from '@/lib/format';
@@ -59,8 +60,13 @@ export default function Profile() {
     if (!picked) return;
     setBusy(true);
     try {
-      const media = await uploadMedia(picked.uri, { kind: 'image', folder: 'avatars' });
-      const error = await updateProfile({ avatar_url: media.url });
+      const media = await uploadMedia(picked.uri, {
+        kind: 'image',
+        folder: 'avatars',
+        fileName: picked.fileName,
+        mimeType: picked.mimeType,
+      });
+      const error = await updateProfile({ avatar_url: media.path });
       if (error) Alert.alert('Fotoğraf güncellenemedi', error);
     } catch (e) {
       Alert.alert('Fotoğraf güncellenemedi', e instanceof Error ? e.message : 'Bir hata oluştu.');
@@ -121,7 +127,7 @@ export default function Profile() {
         renderItem={({ item }) => (
           <View className="mx-5 mb-3 flex-row rounded-2xl bg-gray-50 p-3 dark:bg-gray-800">
             {item.media_type === 'image' && item.media_url ? (
-              <Image source={{ uri: item.media_url }} className="mr-3 h-16 w-16 rounded-xl" resizeMode="cover" />
+              <StorageImage uri={item.media_url} className="mr-3 h-16 w-16 rounded-xl" resizeMode="cover" />
             ) : null}
             <View className="flex-1">
               <Text numberOfLines={3} className="text-gray-900 dark:text-gray-100">

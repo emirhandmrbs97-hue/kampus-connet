@@ -44,6 +44,7 @@ export type ListingRow = {
   price: number;
   category: string;
   condition: string;
+  university?: string | null;
   image_url: string | null;
   status: 'active' | 'sold';
   created_at: string;
@@ -63,7 +64,7 @@ export type ConversationRow = {
 export type ConversationView = ConversationRow & { other?: Profile };
 
 export type Attachment = {
-  kind: 'post' | 'listing';
+  kind: 'image' | 'post' | 'listing';
   id: string;
   title: string;
   subtitle?: string;
@@ -77,4 +78,5 @@ export type MessageRow = {
   body: string;
   attachment: Attachment | null;
   created_at: string;
+  edited_at?: string | null;
 };

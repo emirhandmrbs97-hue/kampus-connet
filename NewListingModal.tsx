@@ -1,8 +1,9 @@
-import { Camera } from 'lucide-react-native';
+import { Camera, ChevronDown } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, Field, Sheet } from '@/components/ui';
+import { UniversityPickerModal } from './UniversityPickerModal';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { pickImage } from '@/services/mediaPicker';
@@ -51,9 +52,11 @@ export function NewListingModal({
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
+  const [university, setUniversity] = useState<string | null>(null);
+  const [universityPickerOpen, setUniversityPickerOpen] = useState(false);
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [condition, setCondition] = useState(CONDITIONS[2]);
-  const [errors, setErrors] = useState<{ title?: string; price?: string }>({});
+  const [errors, setErrors] = useState<{ title?: string; price?: string; university?: string }>({});
   const [busy, setBusy] = useState(false);
 
   const reset = () => {
@@ -61,6 +64,7 @@ export function NewListingModal({
     setTitle('');
     setPrice('');
     setDescription('');
+    setUniversity(null);
     setCategory(CATEGORIES[0]);
     setCondition(CONDITIONS[2]);
     setErrors({});
@@ -72,15 +76,19 @@ export function NewListingModal({
     const next = {
       title: title.trim().length < 3 ? 'Başlık en az 3 karakter olmalı.' : undefined,
       price: !Number.isFinite(value) || value <= 0 ? 'Geçerli bir fiyat gir.' : undefined,
+      university: university ? undefined : 'İlan vermek için bir üniversite seç.',
     };
     setErrors(next);
-    if (next.title || next.price) return;
+    if (next.title || next.price || next.university) {
+      if (next.university) Alert.alert('Üniversite seç', next.university);
+      return;
+    }
 
     setBusy(true);
     try {
       let url: string | null = null;
       if (image) {
-        url = (await uploadMedia(image, { kind: 'image', folder: 'listings' })).url;
+        url = (await uploadMedia(image, { kind: 'image', folder: 'listings' })).path;
       }
       const { error } = await supabase.from('listings').insert({
         seller_id: user.id,
@@ -89,6 +97,7 @@ export function NewListingModal({
         price: value,
         category,
         condition,
+        university,
         image_url: url,
       });
       if (error) throw error;
@@ -103,50 +112,84 @@ export function NewListingModal({
   };
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="İlan ver" tall>
-      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Pressable
-          onPress={async () => {
-            const p = await pickImage();
-            if (p) setImage(p.uri);
-          }}
-          className="mb-4 h-44 items-center justify-center overflow-hidden rounded-3xl bg-gray-100 dark:bg-gray-800"
-        >
-          {image ? (
-            <Image source={{ uri: image }} className="h-full w-full" resizeMode="cover" />
-          ) : (
-            <>
-              <Camera size={30} color="#9ca3af" />
-              <Text className="mt-2 text-gray-500 dark:text-gray-400">Fotoğraf ekle</Text>
-            </>
-          )}
-        </Pressable>
+    <>
+      <Sheet
+        visible={visible}
+        onClose={() => {
+          setUniversityPickerOpen(false);
+          onClose();
+        }}
+        title="İlan ver"
+        tall
+      >
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Pressable
+            onPress={async () => {
+              const p = await pickImage();
+              if (p) setImage(p.uri);
+            }}
+            className="mb-4 h-44 items-center justify-center overflow-hidden rounded-3xl bg-gray-100 dark:bg-gray-800"
+          >
+            {image ? (
+              <Image source={{ uri: image }} className="h-full w-full" resizeMode="cover" />
+            ) : (
+              <>
+                <Camera size={30} color="#9ca3af" />
+                <Text className="mt-2 text-gray-500 dark:text-gray-400">Fotoğraf ekle</Text>
+              </>
+            )}
+          </Pressable>
 
-        <Field label="Başlık" placeholder="Örn. Calculus kitabı" value={title} onChangeText={setTitle} error={errors.title} />
-        <Field
-          label="Fiyat (₺)"
-          placeholder="250"
-          keyboardType="decimal-pad"
-          value={price}
-          onChangeText={setPrice}
-          error={errors.price}
-        />
-        <Field
-          label="Açıklama"
-          placeholder="Ürün hakkında kısa bilgi"
-          multiline
-          textAlignVertical="top"
-          value={description}
-          onChangeText={setDescription}
-        />
+          <Field label="Başlık" placeholder="Örn. Calculus kitabı" value={title} onChangeText={setTitle} error={errors.title} />
+          <Field
+            label="Fiyat (₺)"
+            placeholder="250"
+            keyboardType="decimal-pad"
+            value={price}
+            onChangeText={setPrice}
+            error={errors.price}
+          />
+          <Field
+            label="Açıklama"
+            placeholder="Ürün hakkında kısa bilgi"
+            multiline
+            textAlignVertical="top"
+            value={description}
+            onChangeText={setDescription}
+          />
+          <Text className="mb-1.5 text-sm font-medium text-gray-700 dark:text-gray-300">Üniversite Seç *</Text>
+          <Pressable
+            onPress={() => setUniversityPickerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={university ? `Üniversite: ${university}` : 'Üniversite seç'}
+            className={`mb-1 flex-row items-center justify-between rounded-2xl border bg-gray-50 px-4 py-3.5 dark:bg-gray-800 ${
+              errors.university ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'
+            }`}
+          >
+            <Text className={university ? 'text-base text-gray-900 dark:text-white' : 'text-base text-gray-400'}>
+              {university ?? 'Üniversite Seç'}
+            </Text>
+            <ChevronDown size={18} color="#9ca3af" />
+          </Pressable>
+          {errors.university ? <Text className="mb-4 mt-1 text-xs text-red-600">{errors.university}</Text> : <View className="mb-4" />}
 
-        <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Kategori</Text>
-        <Chips options={CATEGORIES} value={category} onChange={setCategory} />
-        <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Durum</Text>
-        <Chips options={CONDITIONS} value={condition} onChange={setCondition} />
+          <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Kategori</Text>
+          <Chips options={CATEGORIES} value={category} onChange={setCategory} />
+          <Text className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Durum</Text>
+          <Chips options={CONDITIONS} value={condition} onChange={setCondition} />
 
-        <Button title="İlanı yayınla" onPress={submit} loading={busy} />
-      </ScrollView>
-    </Sheet>
+          <Button title="İlanı yayınla" onPress={submit} loading={busy} />
+        </ScrollView>
+      </Sheet>
+      <UniversityPickerModal
+        visible={universityPickerOpen}
+        selectedUniversity={university}
+        onSelect={(value) => {
+          setUniversity(value);
+          if (value) setErrors((current) => ({ ...current, university: undefined }));
+        }}
+        onClose={() => setUniversityPickerOpen(false)}
+      />
+    </>
   );
 }

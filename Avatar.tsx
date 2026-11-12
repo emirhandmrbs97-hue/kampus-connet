@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Image, Text } from 'react-native';
+import { View, Text } from 'react-native';
 import { User } from 'lucide-react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from './ThemeContext';
+import { StorageImage } from '@/components/StorageImage';
 
 interface AvatarProps {
   uri?: string;
@@ -28,7 +29,7 @@ export const Avatar: React.FC<AvatarProps> = ({ uri, name, size = 40, className 
       }`}
     >
       {uri ? (
-        <Image source={{ uri }} className="w-full h-full" resizeMode="cover" />
+        <StorageImage uri={uri} className="w-full h-full" resizeMode="cover" />
       ) : name ? (
         <Text className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`} style={{ fontSize: size * 0.4 }}>
           {getInitials(name)}

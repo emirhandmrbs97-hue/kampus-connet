@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { useTheme } from './ThemeContext';
+import { StorageImage } from '@/components/StorageImage';
 
 interface ProductCardProps {
   id: string;
@@ -26,7 +27,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       className={`flex-1 m-2 rounded-xl overflow-hidden ${isDark ? 'bg-gray-800' : 'bg-white'} shadow-md`}
     >
       {image ? (
-        <Image source={{ uri: image }} className="w-full h-32" resizeMode="cover" />
+        <StorageImage uri={image} className="w-full h-32" resizeMode="cover" />
       ) : (
         <View className="w-full h-32 bg-gray-300 items-center justify-center">
           <Text className="text-gray-500">Resim Yok</Text>

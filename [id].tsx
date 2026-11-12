@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, MessageCircle, Share2, ShoppingBag } from 'lucide-react-native';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ShareSheet } from '@/components/ShareSheet';
 import { Avatar, Button, Field, Sheet } from '@/components/ui';
+import { StorageImage } from '@/components/StorageImage';
 import { useAuth } from '@/context/AuthContext';
 import { formatPrice, timeAgo } from '@/lib/format';
 import { supabase } from '@/lib/supabase';
@@ -142,7 +143,7 @@ export default function ListingDetail() {
 
       <ScrollView contentContainerClassName="pb-6">
         {listing.image_url ? (
-          <Image source={{ uri: listing.image_url }} className="mx-4 h-72 rounded-3xl" resizeMode="cover" />
+          <StorageImage uri={listing.image_url} className="mx-4 h-72 rounded-3xl" resizeMode="cover" />
         ) : (
           <View className="mx-4 h-72 items-center justify-center rounded-3xl bg-gray-100 dark:bg-gray-800">
             <ShoppingBag size={40} color="#9ca3af" />
