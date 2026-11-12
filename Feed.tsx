@@ -1,24 +1,38 @@
+import { router } from 'expo-router';
 import { Plus } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CommentsSheet } from '@/components/CommentsSheet';
+import { NativeAdCard } from './components/NativeAdCard';
 import { PostCard } from '@/components/PostCard';
 import { PostComposer } from '@/components/PostComposer';
 import { ShareSheet } from '@/components/ShareSheet';
 import { StoriesBar, type StoriesBarHandle } from '@/components/StoriesBar';
 import { EmptyState } from '@/components/ui';
+import { NotificationBellButton } from '@/components/NotificationBellButton';
+import { NotificationCenter } from '@/components/NotificationCenter';
 import { useAuth } from '@/context/AuthContext';
+import { useNotifications } from '@/context/NotificationContext';
 import { supabase } from '@/lib/supabase';
 import { fetchProfiles } from '@/services/profiles';
 import type { Attachment, PostRow, PostView } from '@/types';
+import type { NotificationActivity } from './hooks/useRealtimeNotifications';
 
 type LikeRow = { post_id: string; user_id: string };
 type CommentRow = { post_id: string };
+type FeedItem = { type: 'post'; post: PostView } | { type: 'ad'; id: string };
 
-export default function Feed() {
+export default function FeedScreen() {
   const { user } = useAuth();
+  const {
+    unreadCount,
+    activities,
+    markNotificationRead,
+    markAllNotificationsRead,
+    refreshNotifications,
+  } = useNotifications();
   const storiesRef = useRef<StoriesBarHandle>(null);
 
   const [posts, setPosts] = useState<PostView[]>([]);
@@ -29,6 +43,17 @@ export default function Feed() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null);
   const [share, setShare] = useState<{ attachment: Attachment; text: string } | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const feedItems = useMemo<FeedItem[]>(() => {
+    const items: FeedItem[] = [];
+    posts.forEach((post, index) => {
+      items.push({ type: 'post', post });
+      if (index % 10 === 9) {
+        items.push({ type: 'ad', id: `ad-feed-${index + 1}` });
+      }
+    });
+    return items;
+  }, [posts]);
 
   const loadPosts = useCallback(async () => {
     if (!user) return;
@@ -169,26 +194,46 @@ export default function Feed() {
     }
   };
 
+  const openNotification = async (activity: NotificationActivity) => {
+    setNotificationsOpen(false);
+    await markNotificationRead(activity.id);
+    if (activity.relatedType === 'confession' && activity.relatedId) {
+      router.navigate({
+        pathname: '/(tabs)/confessions',
+        params: { confessionId: activity.relatedId, notificationId: activity.id },
+      });
+    }
+  };
+
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-white dark:bg-gray-900">
-      <View className="flex-row items-center justify-between px-5 pb-1 pt-2">
-        <Text className="text-2xl font-extrabold text-gray-900 dark:text-white">Ana sayfa</Text>
-        <Pressable
-          onPress={() => setComposerOpen(true)}
-          className="h-10 w-10 items-center justify-center rounded-full bg-primary-500"
-        >
-          <Plus size={22} color="#fff" />
-        </Pressable>
+      <View className="flex-row items-center justify-between px-5 pb-0 pt-2">
+        <Text className="text-xl font-extrabold text-gray-900 dark:text-white">Kampüs Gündemi</Text>
+        <View className="flex-row items-center gap-2">
+          <NotificationBellButton
+            count={unreadCount}
+            onPress={() => setNotificationsOpen(true)}
+          />
+          <Pressable
+            onPress={() => setComposerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Yeni gönderi oluştur"
+            style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] })}
+            className="h-10 w-10 items-center justify-center rounded-full bg-primary-500"
+          >
+            <Plus size={22} color="#fff" />
+          </Pressable>
+        </View>
       </View>
+      <StoriesBar ref={storiesRef} />
 
       {loading ? (
         <ActivityIndicator className="mt-10" color="#0ea5e9" />
       ) : (
         <FlatList
-          data={posts}
-          keyExtractor={(p) => p.id}
+          data={feedItems}
+          keyExtractor={(item) => item.type === 'ad' ? item.id : item.post.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-          ListHeaderComponent={<StoriesBar ref={storiesRef} />}
           ListEmptyComponent={
             loadError ? (
               <EmptyState title="Gönderiler yüklenemedi" hint={loadError} />
@@ -197,9 +242,11 @@ export default function Feed() {
             )
           }
           contentContainerStyle={{ paddingBottom: 24 }}
-          renderItem={({ item }) => (
+          renderItem={({ item }) => item.type === 'ad' ? (
+            <NativeAdCard key={item.id} />
+          ) : (
             <PostCard
-              post={item}
+              post={item.post}
               onLike={onLike}
               onComment={onComment}
               onShare={onShare}
@@ -214,6 +261,14 @@ export default function Feed() {
       <PostComposer visible={composerOpen} onClose={() => setComposerOpen(false)} onPosted={refresh} />
       <CommentsSheet postId={commentsPostId} onClose={() => setCommentsPostId(null)} onCountChange={onCommentCountChange} />
       <ShareSheet attachment={share?.attachment ?? null} shareText={share?.text ?? ''} onClose={() => setShare(null)} />
+      <NotificationCenter
+        visible={notificationsOpen}
+        activities={activities}
+        onClose={() => setNotificationsOpen(false)}
+        onPressActivity={(activity) => void openNotification(activity)}
+        onMarkAllRead={markAllNotificationsRead}
+        onRefresh={refreshNotifications}
+      />
     </SafeAreaView>
   );
 }

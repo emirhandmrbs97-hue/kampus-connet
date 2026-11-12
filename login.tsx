@@ -1,30 +1,38 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Check } from 'lucide-react-native';
 
 import { Button, Field } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
-import { isSupabaseConfigured } from '@/lib/supabase';
-import { validateEmail } from '@/lib/validation';
+import { getRememberSessionPreference, isSupabaseConfigured } from '@/lib/supabase';
+import { validateUsername } from '@/lib/validation';
 
 export default function Login() {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [rememberMe, setRememberMe] = useState(true);
+  const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    getRememberSessionPreference()
+      .then(setRememberMe)
+      .catch((error: unknown) => console.error('[auth] Failed to load remember-session preference:', error));
+  }, []);
+
   const submit = async () => {
-    const next: { email?: string; password?: string } = {};
-    const emailError = validateEmail(email);
-    if (emailError) next.email = emailError;
+    const next: { username?: string; password?: string } = {};
+    const usernameError = validateUsername(username.trim().toLowerCase());
+    if (usernameError) next.username = usernameError;
     if (!password) next.password = 'Şifre gerekli.';
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
     setBusy(true);
-    const error = await signIn(email.trim(), password);
+    const error = await signIn(username.trim().toLowerCase(), password, rememberMe);
     setBusy(false);
     if (error) setErrors({ password: error });
     // Başarılıysa kök layout kullanıcıyı otomatik olarak ana ekrana alır.
@@ -34,6 +42,14 @@ export default function Login() {
     <SafeAreaView className="flex-1 bg-white dark:bg-gray-900">
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerClassName="px-6 pb-10 pt-12" keyboardShouldPersistTaps="handled">
+          <View className="mb-8 flex-row items-center">
+            <Image
+              source={require('./icon.png')}
+              resizeMode="contain"
+              style={{ width: 48, height: 48, borderRadius: 12, marginRight: 12 }}
+            />
+            <Text className="text-xl font-extrabold text-gray-900 dark:text-white">Campus Connect</Text>
+          </View>
           <Text className="text-3xl font-extrabold text-gray-900 dark:text-white">Giriş yap</Text>
           <Text className="mb-8 mt-1 text-base text-gray-500 dark:text-gray-400">Campus Connect'a hoş geldin</Text>
 
@@ -47,15 +63,14 @@ export default function Login() {
           ) : null}
 
           <Field
-            label="E-posta"
-            placeholder="ornek@email.com"
-            value={email}
-            onChangeText={setEmail}
-            error={errors.email}
-            keyboardType="email-address"
+            label="Kullanıcı adı"
+            placeholder="kullaniciadi"
+            value={username}
+            onChangeText={setUsername}
+            error={errors.username}
             autoCapitalize="none"
             autoCorrect={false}
-            autoComplete="email"
+            autoComplete="username"
           />
           <Field
             label="Şifre"
@@ -66,6 +81,22 @@ export default function Login() {
             secureTextEntry
             autoComplete="current-password"
           />
+
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: rememberMe }}
+            onPress={() => setRememberMe((value) => !value)}
+            className="mb-5 flex-row items-center self-start"
+          >
+            <View
+              className={`mr-2 h-5 w-5 items-center justify-center rounded border ${
+                rememberMe ? 'border-primary-600 bg-primary-600' : 'border-gray-400 bg-white dark:bg-gray-800'
+              }`}
+            >
+              {rememberMe ? <Check size={14} color="white" strokeWidth={3} /> : null}
+            </View>
+            <Text className="text-sm text-gray-700 dark:text-gray-300">Beni hatırla</Text>
+          </Pressable>
 
           <Button title="Giriş yap" onPress={submit} loading={busy} />
 

@@ -1,6 +1,8 @@
 -- =====================================================================
 -- Campus Connect – Supabase şeması
 -- Supabase paneli > SQL Editor > New query > bu dosyanın TAMAMINI yapıştır > Run
+-- Kullanıcı adıyla giriş için ayrıca Supabase CLI ile projeyi bağlayıp
+-- `supabase functions deploy login-with-username` komutunu çalıştırın.
 -- Tekrar çalıştırmak güvenlidir (idempotent).
 -- =====================================================================
 
@@ -46,6 +48,7 @@ create table if not exists public.comments (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.posts(id) on delete cascade,
   author_id uuid not null references public.profiles(id) on delete cascade,
+  parent_comment_id uuid references public.comments(id) on delete cascade,
   body text not null check (length(body) > 0),
   created_at timestamptz not null default now()
 );
@@ -65,10 +68,14 @@ create table if not exists public.listings (
   price numeric(12,2) not null check (price >= 0),
   category text not null default 'Diğer',
   condition text not null default 'İyi',
+  university text,
   image_url text,
   status text not null default 'active' check (status in ('active','sold')),
   created_at timestamptz not null default now()
 );
+alter table public.listings add column if not exists university text;
+create index if not exists listings_active_university_idx
+  on public.listings (university, created_at desc) where status = 'active';
 
 create table if not exists public.offers (
   id uuid primary key default gen_random_uuid(),
@@ -98,8 +105,10 @@ create table if not exists public.messages (
   body text not null default '',
   attachment jsonb,
   created_at timestamptz not null default now(),
+  edited_at timestamptz,
   check (body <> '' or attachment is not null)
 );
+alter table public.messages add column if not exists edited_at timestamptz;
 create index if not exists messages_conv_idx on public.messages (conversation_id, created_at);
 
 -- ---------- Yeni kullanıcı => profil ----------
@@ -219,18 +228,66 @@ drop policy if exists likes_delete on public.likes;
 create policy likes_delete on public.likes for delete to authenticated using (user_id = auth.uid());
 
 -- comments
+create or replace function public.validate_comment_parent()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+set row_security = off
+as $$
+begin
+  if new.parent_comment_id is not null
+     and not exists (
+       select 1
+         from public.comments parent
+        where parent.id = new.parent_comment_id
+          and parent.post_id = new.post_id
+     ) then
+    raise exception 'Parent comment must belong to the same post'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.validate_comment_parent() from public;
+revoke all on function public.validate_comment_parent() from anon;
+revoke all on function public.validate_comment_parent() from authenticated;
+
+drop trigger if exists comments_validate_parent on public.comments;
+create trigger comments_validate_parent
+  before insert or update of parent_comment_id, post_id
+  on public.comments
+  for each row
+  execute function public.validate_comment_parent();
+
+create index if not exists comments_thread_order_idx
+  on public.comments (post_id, parent_comment_id, created_at);
+
 drop policy if exists comments_select on public.comments;
 create policy comments_select on public.comments for select to authenticated using (exists (select 1 from public.posts p where p.id = post_id));
 drop policy if exists comments_insert on public.comments;
-create policy comments_insert on public.comments for insert to authenticated with check (author_id = auth.uid() and exists (select 1 from public.posts p where p.id = post_id));
+create policy comments_insert on public.comments
+  for insert to authenticated
+  with check (
+    author_id = auth.uid()
+    and exists (
+      select 1
+        from public.posts p
+       where p.id = comments.post_id
+         and coalesce(p.comments_disabled, false) = false
+    )
+  );
 drop policy if exists comments_delete on public.comments;
 create policy comments_delete on public.comments for delete to authenticated using (author_id = auth.uid());
 
 -- stories
+alter table public.stories enable row level security;
 drop policy if exists stories_select on public.stories;
 create policy stories_select on public.stories for select to authenticated using (true);
 drop policy if exists stories_insert on public.stories;
-create policy stories_insert on public.stories for insert to authenticated with check (author_id = auth.uid());
+create policy stories_insert on public.stories
+  for insert to authenticated
+  with check (author_id = (select auth.uid()));
 drop policy if exists stories_delete on public.stories;
 create policy stories_delete on public.stories for delete to authenticated using (author_id = auth.uid());
 
@@ -273,6 +330,28 @@ create policy msg_insert on public.messages for insert to authenticated with che
       and (c.status = 'accepted' or (c.status = 'pending' and c.initiator_id = auth.uid()))
   )
 );
+drop policy if exists msg_update_own on public.messages;
+create policy msg_update_own on public.messages for update to authenticated
+using (
+  sender_id = auth.uid() and exists (
+    select 1 from public.conversations c
+    where c.id = conversation_id and auth.uid() in (c.initiator_id, c.recipient_id)
+  )
+)
+with check (
+  sender_id = auth.uid() and exists (
+    select 1 from public.conversations c
+    where c.id = conversation_id and auth.uid() in (c.initiator_id, c.recipient_id)
+  )
+);
+drop policy if exists msg_delete_own on public.messages;
+create policy msg_delete_own on public.messages for delete to authenticated
+using (
+  sender_id = auth.uid() and exists (
+    select 1 from public.conversations c
+    where c.id = conversation_id and auth.uid() in (c.initiator_id, c.recipient_id)
+  )
+);
 
 -- ---------- Yetkiler ----------
 grant usage on schema public to anon, authenticated;
@@ -285,3 +364,231 @@ do $$ begin
   alter publication supabase_realtime add table public.messages;
 exception when duplicate_object then null;
 end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.likes;
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.comments;
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  alter publication supabase_realtime add table public.conversations;
+exception when duplicate_object then null;
+end $$;
+
+-- ---------- Supabase Storage (kullanıcı medyası) ----------
+insert into storage.buckets (id, name, public)
+values ('campus-media', 'campus-media', false)
+on conflict (id) do update set public = false;
+
+drop policy if exists campus_media_public_read on storage.objects;
+drop policy if exists "Herkes public dosyaları okuyabilir" on storage.objects;
+
+drop policy if exists campus_media_owner_insert on storage.objects;
+grant insert on table storage.objects to authenticated;
+create policy campus_media_owner_insert on storage.objects
+  for insert to authenticated with check (
+    bucket_id = 'campus-media'
+    and (storage.foldername(name))[1] in (
+      'avatars',
+      'posts',
+      'stories',
+      'listings',
+      'messages',
+      'confessions'
+    )
+    and (storage.foldername(name))[2] = (select auth.uid())::text
+  );
+
+drop policy if exists campus_media_insert_guard on storage.objects;
+create policy campus_media_insert_guard on storage.objects
+  as restrictive
+  for insert to public
+  with check (
+    bucket_id <> 'campus-media'
+    or (
+      (storage.foldername(name))[1] in (
+        'avatars',
+        'posts',
+        'stories',
+        'listings',
+        'messages',
+        'confessions'
+      )
+      and (storage.foldername(name))[2] = (select auth.uid())::text
+    )
+  );
+
+drop policy if exists campus_media_owner_update on storage.objects;
+create policy campus_media_owner_update on storage.objects
+  for update to authenticated using (
+    bucket_id = 'campus-media'
+    and (storage.foldername(name))[2] = auth.uid()::text
+  ) with check (
+    bucket_id = 'campus-media'
+    and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+drop policy if exists campus_media_owner_delete on storage.objects;
+create policy campus_media_owner_delete on storage.objects
+  for delete to authenticated using (
+    bucket_id = 'campus-media'
+    and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+create or replace function public.can_read_chat_media(object_path text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+      from public.messages m
+      join public.conversations c on c.id = m.conversation_id
+     where m.attachment->>'kind' = 'image'
+       and m.attachment->>'image' = object_path
+       and (
+         m.sender_id::text = (storage.foldername(object_path))[1]
+         or m.sender_id::text = (storage.foldername(object_path))[2]
+       )
+       and (
+         (storage.foldername(object_path))[1] = 'messages'
+         or (storage.foldername(object_path))[2] = 'messages'
+       )
+       and auth.uid() in (c.initiator_id, c.recipient_id)
+  );
+$$;
+
+drop policy if exists campus_media_read_referenced on storage.objects;
+create policy campus_media_read_referenced on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'campus-media'
+    and (
+      (storage.foldername(name))[1] = (select auth.uid())::text
+      or (storage.foldername(name))[2] = (select auth.uid())::text
+      or exists (
+        select 1 from public.profiles p
+        where p.avatar_url = objects.name
+          and (
+            ((storage.foldername(objects.name))[1] = 'avatars'
+              and p.id::text = (storage.foldername(objects.name))[2])
+            or (p.id::text = (storage.foldername(objects.name))[1]
+              and (storage.foldername(objects.name))[2] = 'avatars')
+          )
+      )
+      or exists (
+        select 1
+          from public.posts p
+          join public.profiles owner on owner.id = p.author_id
+         where p.media_url = objects.name
+           and (
+             ((storage.foldername(objects.name))[1] = 'posts'
+               and p.author_id::text = (storage.foldername(objects.name))[2])
+             or (p.author_id::text = (storage.foldername(objects.name))[1]
+               and (storage.foldername(objects.name))[2] = 'posts')
+           )
+           and (p.author_id = (select auth.uid()) or not owner.is_private or exists (
+             select 1 from public.follows f
+             where f.follower_id = (select auth.uid()) and f.following_id = p.author_id
+           ))
+      )
+      or exists (
+        select 1
+          from public.stories s
+          join public.profiles owner on owner.id = s.author_id
+         where s.media_url = objects.name
+           and (
+             ((storage.foldername(objects.name))[1] = 'stories'
+               and s.author_id::text = (storage.foldername(objects.name))[2])
+             or (s.author_id::text = (storage.foldername(objects.name))[1]
+               and (storage.foldername(objects.name))[2] = 'stories')
+           )
+           and (s.author_id = (select auth.uid()) or not owner.is_private or exists (
+             select 1 from public.follows f
+             where f.follower_id = (select auth.uid()) and f.following_id = s.author_id
+           ))
+      )
+      or exists (
+        select 1 from public.listings l
+        where l.image_url = objects.name
+          and (
+            ((storage.foldername(objects.name))[1] = 'listings'
+              and l.seller_id::text = (storage.foldername(objects.name))[2])
+            or (l.seller_id::text = (storage.foldername(objects.name))[1]
+              and (storage.foldername(objects.name))[2] = 'listings')
+          )
+          and (l.status in ('active', 'sold') or l.seller_id = (select auth.uid()))
+      )
+      or public.can_read_chat_media(name)
+    )
+  );
+
+drop policy if exists campus_media_select_guard on storage.objects;
+create policy campus_media_select_guard on storage.objects
+  as restrictive
+  for select to public
+  using (
+    bucket_id <> 'campus-media'
+    or (
+      (storage.foldername(name))[1] = (select auth.uid())::text
+      or (storage.foldername(name))[2] = (select auth.uid())::text
+      or exists (
+        select 1 from public.profiles p
+        where p.avatar_url = objects.name
+          and (
+            ((storage.foldername(objects.name))[1] = 'avatars'
+              and p.id::text = (storage.foldername(objects.name))[2])
+            or (p.id::text = (storage.foldername(objects.name))[1]
+              and (storage.foldername(objects.name))[2] = 'avatars')
+          )
+      )
+      or exists (
+        select 1
+          from public.posts p
+          join public.profiles owner on owner.id = p.author_id
+         where p.media_url = objects.name
+           and (
+             ((storage.foldername(objects.name))[1] = 'posts'
+               and p.author_id::text = (storage.foldername(objects.name))[2])
+             or (p.author_id::text = (storage.foldername(objects.name))[1]
+               and (storage.foldername(objects.name))[2] = 'posts')
+           )
+           and (p.author_id = (select auth.uid()) or not owner.is_private or exists (
+             select 1 from public.follows f
+             where f.follower_id = (select auth.uid()) and f.following_id = p.author_id
+           ))
+      )
+      or exists (
+        select 1
+          from public.stories s
+          join public.profiles owner on owner.id = s.author_id
+         where s.media_url = objects.name
+           and (
+             ((storage.foldername(objects.name))[1] = 'stories'
+               and s.author_id::text = (storage.foldername(objects.name))[2])
+             or (s.author_id::text = (storage.foldername(objects.name))[1]
+               and (storage.foldername(objects.name))[2] = 'stories')
+           )
+           and (s.author_id = (select auth.uid()) or not owner.is_private or exists (
+             select 1 from public.follows f
+             where f.follower_id = (select auth.uid()) and f.following_id = s.author_id
+           ))
+      )
+      or exists (
+        select 1 from public.listings l
+        where l.image_url = objects.name
+          and (
+            ((storage.foldername(objects.name))[1] = 'listings'
+              and l.seller_id::text = (storage.foldername(objects.name))[2])
+            or (l.seller_id::text = (storage.foldername(objects.name))[1]
+              and (storage.foldername(objects.name))[2] = 'listings')
+          )
+          and (l.status in ('active', 'sold') or l.seller_id = (select auth.uid()))
+      )
+      or public.can_read_chat_media(name)
+    )
+  );

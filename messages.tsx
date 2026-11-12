@@ -107,6 +107,10 @@ export default function Messages() {
           renderItem={({ item }) => (
             <Pressable
               onPress={() => openChat(item.id)}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.76 : 1,
+                transform: [{ scale: pressed ? 0.985 : 1 }],
+              })}
               className="flex-row items-center border-b border-gray-100 px-5 py-3.5 dark:border-gray-800"
             >
               <Avatar uri={item.other?.avatar_url} name={item.other?.full_name} size={50} />

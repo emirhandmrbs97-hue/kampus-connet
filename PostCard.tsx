@@ -1,8 +1,19 @@
 import { Archive, FileText, Heart, MessageCircle, MoreHorizontal, Send, Unlock, EyeOff } from 'lucide-react-native';
 import { memo, useRef, useState } from 'react';
-import { Animated, Image, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ActionSheet, Avatar } from '@/components/ui';
+import { StorageImage } from '@/components/StorageImage';
 import { timeAgo } from '@/lib/format';
 import { openFile } from '@/lib/openFile';
 import type { PostView } from '@/types';
@@ -24,8 +35,17 @@ function PostCardBase({
   onToggleComments?: (post: PostView) => void;
   onToggleLikeCount?: (post: PostView) => void;
 }) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const likeScale = useSharedValue(1);
+  const heartProgress = useSharedValue(0);
+  const lastImageTap = useRef(0);
   const [menuVisible, setMenuVisible] = useState(false);
+  const likeIconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: likeScale.value }],
+  }));
+  const heartOverlayStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(heartProgress.value, [0, 0.12, 0.75, 1], [0, 1, 1, 0]),
+    transform: [{ scale: interpolate(heartProgress.value, [0, 0.7, 1], [0.25, 1.2, 0.95]) }],
+  }));
 
   const handleArchive = () => {
     if (onArchive) onArchive(post);
@@ -42,14 +62,38 @@ function PostCardBase({
     setMenuVisible(false);
   };
 
+  const popHeart = () => {
+    cancelAnimation(heartProgress);
+    heartProgress.value = withSequence(
+      withTiming(0, { duration: 1 }),
+      withSpring(1, { damping: 10, stiffness: 180 }),
+      withDelay(450, withTiming(0, { duration: 220 })),
+    );
+  };
+
+  const animateLike = () => {
+    popHeart();
+    cancelAnimation(likeScale);
+    likeScale.value = withSequence(
+      withSpring(1.35, { damping: 6, stiffness: 240 }),
+      withSpring(1, { damping: 9, stiffness: 180 }),
+    );
+  };
+
   const like = () => {
-    if (!post.liked) {
-      Animated.sequence([
-        Animated.spring(scale, { toValue: 1.5, speed: 40, bounciness: 12, useNativeDriver: true }),
-        Animated.spring(scale, { toValue: 1, speed: 20, bounciness: 8, useNativeDriver: true }),
-      ]).start();
-    }
+    animateLike();
     onLike(post);
+  };
+
+  const handleImagePress = () => {
+    const now = Date.now();
+    if (now - lastImageTap.current < 300) {
+      lastImageTap.current = 0;
+      popHeart();
+      if (!post.liked) onLike(post);
+      return;
+    }
+    lastImageTap.current = now;
   };
 
   return (
@@ -64,7 +108,11 @@ function PostCardBase({
             @{post.author?.username} · {timeAgo(post.created_at)}
           </Text>
         </View>
-        <Pressable onPress={() => setMenuVisible(true)} hitSlop={8}>
+        <Pressable
+          onPress={() => setMenuVisible(true)}
+          hitSlop={8}
+          style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}
+        >
           <MoreHorizontal size={22} color="#9ca3af" />
         </Pressable>
       </View>
@@ -74,11 +122,26 @@ function PostCardBase({
       ) : null}
 
       {post.media_type === 'image' && post.media_url ? (
-        <Image
-          source={{ uri: post.media_url }}
-          className="mt-3 h-64 w-full rounded-2xl bg-gray-200 dark:bg-gray-700"
-          resizeMode="cover"
-        />
+        <Pressable
+          onPress={handleImagePress}
+          accessibilityRole="imagebutton"
+          accessibilityLabel="Gönderi görselini beğenmek için iki kez dokun"
+          style={({ pressed }) => ({ opacity: pressed ? 0.94 : 1 })}
+          className="relative mt-3 overflow-hidden rounded-2xl bg-gray-200 dark:bg-gray-700"
+        >
+          <StorageImage
+            uri={post.media_url}
+            className="h-64 w-full"
+            resizeMode="cover"
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={heartOverlayStyle}
+            className="absolute inset-0 items-center justify-center"
+          >
+            <Heart size={88} color="#fff" fill="#ef4444" strokeWidth={1.5} />
+          </Animated.View>
+        </Pressable>
       ) : null}
 
       {post.media_type === 'pdf' && post.media_url ? (
@@ -99,8 +162,13 @@ function PostCardBase({
       ) : null}
 
       <View className="mt-4 flex-row items-center">
-        <Pressable onPress={like} hitSlop={8} className="mr-6 flex-row items-center">
-          <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          onPress={like}
+          hitSlop={8}
+          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+          className="mr-6 flex-row items-center"
+        >
+          <Animated.View style={likeIconStyle}>
             <Heart
               size={24}
               color={post.liked ? '#ef4444' : '#9ca3af'}

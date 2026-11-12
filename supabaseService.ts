@@ -88,10 +88,11 @@ export const storage = {
     return { data, error };
   },
 
-  // Dosya URL'i al
-  getPublicUrl: (bucket: string, path: string) => {
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
+  // Private buckets need signed URLs; public URLs do not grant access.
+  getSignedUrl: async (bucket: string, path: string, expiresIn = 3600) => {
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn);
+    if (error) throw new Error(`Dosya erişim bağlantısı oluşturulamadı: ${error.message}`);
+    return data.signedUrl;
   },
 
   // Dosya sil

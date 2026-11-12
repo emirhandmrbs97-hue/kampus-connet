@@ -3,14 +3,19 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/components/*": ["./*"],
+      "@/context/*": ["./*"],
+      "@/lib/*": ["./*"],
+      "@/services/*": ["./*"],
+      "@/types": ["./types"]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "supabase/functions/**"
   ]
 }

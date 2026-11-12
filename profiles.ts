@@ -7,7 +7,8 @@ export async function fetchProfiles(ids: string[]): Promise<Record<string, Profi
   const unique = Array.from(new Set(ids.filter(Boolean)));
   const missing = unique.filter((id) => !cache.has(id));
   if (missing.length > 0) {
-    const { data } = await supabase.from('profiles').select('*').in('id', missing);
+    const { data, error } = await supabase.from('profiles').select('*').in('id', missing);
+    if (error) throw new Error(`Profiller yüklenemedi: ${error.message}`);
     (data as Profile[] | null)?.forEach((p) => cache.set(p.id, p));
   }
   const out: Record<string, Profile> = {};

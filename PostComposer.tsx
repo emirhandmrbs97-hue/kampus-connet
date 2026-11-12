@@ -46,14 +46,14 @@ export function PostComposer({
     }
     setBusy(true);
     try {
-      let uploaded: { url: string; kind: 'image' | 'pdf'; fileName?: string } | null = null;
+      let uploaded: { path: string; kind: 'image' | 'pdf'; fileName?: string } | null = null;
       if (media) {
         uploaded = await uploadMedia(media.uri, { kind: media.kind, folder: 'posts', fileName: media.name });
       }
       const { error } = await supabase.from('posts').insert({
         author_id: user.id,
         body: body.trim(),
-        media_url: uploaded?.url ?? null,
+        media_url: uploaded?.path ?? null,
         media_type: uploaded?.kind ?? null,
         file_name: uploaded?.fileName ?? null,
       });

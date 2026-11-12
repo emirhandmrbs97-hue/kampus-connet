@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity } from 'react-native';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from './ThemeContext';
 
 interface ToggleProps {
   value: boolean;

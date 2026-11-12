@@ -1,10 +1,13 @@
-import { StatusBar } from 'expo-status-bar';
+import './global.css';
 import { useEffect } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { ThemeProvider } from './context/ThemeContext';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { AuthProvider, useAuth } from './AuthContext';
+import { ProfileProvider } from './ProfileContext';
+import { ThemeProvider } from './ThemeContext';
+import { NotificationProvider } from './NotificationContext';
 
 // Auth protection wrapper
 function AuthWrapper() {
@@ -34,17 +37,33 @@ function AuthWrapper() {
     );
   }
 
-  return <Slot />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="archive" />
+      <Stack.Screen name="blocked" />
+      <Stack.Screen name="listing/[id]" />
+      <Stack.Screen name="chat/[id]" />
+    </Stack>
+  );
 }
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <AuthWrapper />
-        </AuthProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <ProfileProvider>
+              <NotificationProvider>
+                <AuthWrapper />
+              </NotificationProvider>
+            </ProfileProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
